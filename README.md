@@ -1,6 +1,6 @@
 # Skill Shelf
 
-管理 Claude [Agent Skills](https://agentskills.io) 与 prompt 的服务:类 Git 的版本管理、按自然语言需求路由最合适的 skill、AI 反馈优化闭环,并可作为 **MCP server** 供 agent 直接取用。附带一个 React + Tauri 前端(桌面 / Web 同一套)。
+管理 [Agent Skills](https://agentskills.io) 与 prompt 的服务:类 Git 的版本管理、按自然语言需求路由最合适的 skill、AI 反馈优化闭环,并可作为 **MCP server** 供各类 agent 直接取用。skill 遵循开放的 Agent Skills 规范,**不绑定任何特定 agent 或厂商**——任何支持该规范的 agent 都能消费。附带一个 React + Tauri 前端(桌面 / Web 同一套)。
 
 > 额外能力:同一个服务还兼作**配置中心**——其他服务启动时来这里取配置,而不各自读环境变量。
 
@@ -79,9 +79,10 @@ SKILL_SHELF_URL=http://127.0.0.1:8080 cargo run -p skill-shelf-mcp
 ```bash
 curl -H "X-Config-Token: shelf_…" \
   "http://127.0.0.1:8080/config/resolve?namespace=service-a/prod"
-# → merge(_global, service-a/prod) 的明文 JSON
+# → merge(_global, service-a/prod) 已发布版本的明文 JSON
 ```
 
+- **版本管理**:每个 namespace 有「草稿 / 已发布 / 历史」。编辑改草稿,消费方 `resolve` 始终读**最新已发布版本**;admin 复核逐字段 diff 后点 **Publish** 才生效。可查看历史版本、**回退**(载入草稿再发布)——"回退了再发布"。
 - `_global` 会合并进每一次 resolve,**只放非敏感共享默认值**。
 - Skill Shelf 自身设置与配置中心**完全隔离**,自身密钥不会经 resolve 外泄。
 - 关闭认证(无 `JWT_SECRET`)时,整个配置中心 `/config/*` 拒绝服务。

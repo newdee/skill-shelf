@@ -52,9 +52,14 @@ function nsError(name: string): string | null {
   return null;
 }
 
+/** Format a unix-seconds timestamp; 0 (imported) shows as em dash. */
+function fmtTime(sec: number): string {
+  return sec ? new Date(sec * 1000).toLocaleString() : "—";
+}
+
 export function ConfigCenter() {
   const qc = useQueryClient();
-  const { canWrite } = useAuth();
+  const { canWrite, user } = useAuth();
   // Admin-only queries: don't fire (and don't retry) for non-admins, so a
   // direct visit to /config doesn't storm the server with 401s.
   const nsQuery = useQuery({
@@ -78,7 +83,39 @@ export function ConfigCenter() {
     enabled: canWrite,
     retry: false,
   });
+  // Field-level draft-vs-published diff for the selected namespace.
+  const { data: diff } = useQuery({
+    queryKey: ["nsdiff", sel],
+    queryFn: () => api.namespaceDiff(sel),
+    enabled: canWrite,
+    retry: false,
+  });
   const [delKey, setDelKey] = useState<string | null>(null);
+  // publish + history state
+  const [pubOpen, setPubOpen] = useState(false);
+  const [pubNote, setPubNote] = useState("");
+  const [histOpen, setHistOpen] = useState(false);
+  const [viewVer, setViewVer] = useState<number | null>(null);
+
+  const { data: versions } = useQuery({
+    queryKey: ["nsversions", sel],
+    queryFn: () => api.namespaceVersions(sel),
+    enabled: canWrite && histOpen,
+    retry: false,
+  });
+  const { data: verVars } = useQuery({
+    queryKey: ["nsversion", sel, viewVer],
+    queryFn: () => api.namespaceVersion(sel, viewVer as number),
+    enabled: canWrite && viewVer != null,
+    retry: false,
+  });
+
+  const invalidateNs = (ns: string) => {
+    qc.invalidateQueries({ queryKey: ["namespace", ns] });
+    qc.invalidateQueries({ queryKey: ["nsdiff", ns] });
+    qc.invalidateQueries({ queryKey: ["nsversions", ns] });
+    qc.invalidateQueries({ queryKey: ["namespaces"] });
+  };
 
   // new-key form for the selected namespace
   const [newKey, setNewKey] = useState("");
@@ -102,12 +139,33 @@ export function ConfigCenter() {
     mutationFn: ({ ns, patch }: { ns: string; patch: Record<string, unknown> }) =>
       api.putNamespace(ns, patch),
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["namespace", v.ns] });
-      qc.invalidateQueries({ queryKey: ["namespaces"] });
+      invalidateNs(v.ns);
       setNewKey("");
       setNewVal("");
     },
     onError: (e) => toast.error(`Save failed: ${(e as Error).message}`),
+  });
+
+  const publish = useMutation({
+    mutationFn: () => api.publishNamespace(sel, { author: user?.username ?? "admin", note: pubNote.trim() }),
+    onSuccess: () => {
+      invalidateNs(sel);
+      setPubOpen(false);
+      setPubNote("");
+      toast.success("Published — consumers now resolve the new version");
+    },
+    onError: (e) => toast.error(`Publish failed: ${(e as Error).message}`),
+  });
+
+  const rollback = useMutation({
+    mutationFn: (version: number) => api.rollbackNamespace(sel, version),
+    onSuccess: () => {
+      invalidateNs(sel);
+      setHistOpen(false);
+      setViewVer(null);
+      toast.success("Loaded into draft — review, then Publish to go live");
+    },
+    onError: (e) => toast.error(`Rollback failed: ${(e as Error).message}`),
   });
 
   const createClient = useMutation({
@@ -139,6 +197,13 @@ export function ConfigCenter() {
   useEffect(() => {
     if (namespaces && !nsNames.includes(sel)) setSel(GLOBAL_NS);
   }, [namespaces, nsNames, sel]);
+
+  // Reset version-history state when the selected namespace changes, so an open
+  // History dialog never shows a previous namespace's version.
+  useEffect(() => {
+    setHistOpen(false);
+    setViewVer(null);
+  }, [sel]);
 
   const newKeyErr = newKey.trim() && nsView?.vars.some((v) => v.key === newKey.trim())
     ? "Key already exists"
@@ -185,30 +250,86 @@ export function ConfigCenter() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
-            {nsNames.map((n) => (
-              <button
-                key={n}
-                type="button"
-                aria-pressed={n === sel}
-                onClick={() => setSel(n)}
-                className={
-                  "rounded-full px-3 py-1 text-sm transition-colors " +
-                  (n === sel ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")
-                }
-              >
-                {n}
-                {n === GLOBAL_NS && <span className="ml-1 opacity-60">· shared</span>}
-              </button>
-            ))}
+            {nsNames.map((n) => {
+              const dirty = namespaces?.find((x) => x.name === n)?.dirty;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={n === sel}
+                  onClick={() => setSel(n)}
+                  className={
+                    "flex items-center gap-1 rounded-full px-3 py-1 text-sm transition-colors " +
+                    (n === sel ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent")
+                  }
+                >
+                  {n}
+                  {n === GLOBAL_NS && <span className="opacity-60">· shared</span>}
+                  {dirty && (
+                    <span
+                      className="size-1.5 rounded-full bg-amber-500"
+                      title="Unpublished changes"
+                      aria-label="unpublished changes"
+                    />
+                  )}
+                </button>
+              );
+            })}
             <Button size="sm" variant="outline" onClick={() => setNsOpen(true)}>
               New namespace
             </Button>
           </div>
 
+          {/* Publish bar: version state + publish / history */}
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">
+              {nsView ? (nsView.version ? `published v${nsView.version}` : "never published") : "…"}
+            </Badge>
+            {nsView?.dirty && (
+              <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                unpublished changes
+              </Badge>
+            )}
+            <div className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => setHistOpen(true)}>
+              History
+            </Button>
+            <Button size="sm" disabled={!nsView?.dirty} onClick={() => setPubOpen(true)}>
+              Publish
+            </Button>
+          </div>
+
+          {/* Unpublished changes (draft vs published), field-level */}
+          {nsView?.dirty && diff?.changes.length ? (
+            <div className="flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">
+                {nsView.version ? `Unpublished changes vs published v${nsView.version}` : "Unpublished draft (not yet published)"}
+              </div>
+              {diff.changes.map((c) => (
+                <div key={c.key} className="flex items-center gap-2">
+                  <Badge variant="outline" className="w-20 justify-center text-xs">
+                    {c.status}
+                  </Badge>
+                  <code className="rounded bg-muted px-1">{c.key}</code>
+                  {c.secret ? (
+                    <span className="text-muted-foreground">••••••••</span>
+                  ) : (
+                    <span className="truncate text-muted-foreground">
+                      {c.status !== "added" && <s>{JSON.stringify(c.old)}</s>}
+                      {c.status === "modified" && " → "}
+                      {c.status !== "removed" && JSON.stringify(c.new)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {/* KV list for the selected namespace */}
           <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
             <div className="text-xs font-medium text-muted-foreground">
-              Keys in <code className="rounded bg-muted px-1">{sel}</code>
+              Draft keys in <code className="rounded bg-muted px-1">{sel}</code> — edits here don't affect consumers
+              until you Publish
             </div>
             {nsView?.vars.length ? (
               nsView.vars.map((v) => (
@@ -360,7 +481,9 @@ export function ConfigCenter() {
                       // Seed the list cache so the selection survives the guard
                       // effect before the invalidated refetch lands.
                       qc.setQueryData<NamespaceInfo[]>(["namespaces"], (old = []) =>
-                        old.some((n) => n.name === ns) ? old : [...old, { name: ns, keys: 1 }],
+                        old.some((n) => n.name === ns)
+                          ? old
+                          : [...old, { name: ns, keys: 1, version: 0, dirty: true }],
                       );
                       setSel(ns);
                       setNsOpen(false);
@@ -469,6 +592,105 @@ export function ConfigCenter() {
           <DialogFooter>
             <Button onClick={() => setIssued(null)}>Done</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Publish dialog */}
+      <Dialog
+        open={pubOpen}
+        onOpenChange={(o) => {
+          setPubOpen(o);
+          if (!o) setPubNote("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish {sel}</DialogTitle>
+            <DialogDescription>
+              Snapshots the current draft as v{(nsView?.version ?? 0) + 1}. Consumers resolving this namespace
+              will immediately receive the new values.
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor="pubnote">Note (optional)</FieldLabel>
+            <Input
+              id="pubnote"
+              value={pubNote}
+              onChange={(e) => setPubNote(e.target.value)}
+              placeholder="what changed and why"
+            />
+          </Field>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPubOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={publish.isPending} onClick={() => publish.mutate()}>
+              Publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version history */}
+      <Dialog
+        open={histOpen}
+        onOpenChange={(o) => {
+          setHistOpen(o);
+          if (!o) setViewVer(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>History — {sel}</DialogTitle>
+            <DialogDescription>Published versions, newest first. Roll back loads a version into the draft.</DialogDescription>
+          </DialogHeader>
+          <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+            {versions?.length ? (
+              versions.map((v) => (
+                <div key={v.version} className="rounded-lg border border-border/60 p-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={v.version === nsView?.version ? "default" : "secondary"}>v{v.version}</Badge>
+                    <span className="flex-1 truncate">
+                      {v.note || <span className="text-muted-foreground">(no note)</span>}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setViewVer(viewVer === v.version ? null : v.version)}
+                    >
+                      {viewVer === v.version ? "Hide" : "View"}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={rollback.isPending} onClick={() => rollback.mutate(v.version)}>
+                      Roll back
+                    </Button>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {v.keys} keys · {v.author || "—"} · {fmtTime(v.published_at)}
+                  </div>
+                  {viewVer === v.version && (
+                    <div className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2">
+                      {verVars === undefined ? (
+                        <span className="text-xs text-muted-foreground">Loading…</span>
+                      ) : verVars.length ? (
+                        verVars.map((k) => (
+                          <div key={k.key} className="flex items-center gap-2">
+                            <code className="rounded bg-muted px-1">{k.key}</code>
+                            <span className="flex-1 truncate text-muted-foreground">
+                              {k.secret ? "••••••••" : k.value === undefined ? "—" : JSON.stringify(k.value)}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">(empty)</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No published versions yet.</p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

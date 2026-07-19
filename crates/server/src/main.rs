@@ -31,9 +31,14 @@ fn config_routes() -> Router<AppState> {
     Router::new()
         // Skill Shelf's own settings (admin).
         .route("/config", get(get_config).put(put_config))
-        // Config center — namespaces (admin).
+        // Config center — namespaces + versioning (admin).
         .route("/config/namespaces", get(list_namespaces))
         .route("/config/namespace", get(get_namespace).put(put_namespace))
+        .route("/config/namespace/publish", post(publish_namespace))
+        .route("/config/namespace/versions", get(list_versions))
+        .route("/config/namespace/version", get(get_version))
+        .route("/config/namespace/rollback", post(rollback_namespace))
+        .route("/config/namespace/diff", get(diff_namespace))
         // Config center — clients / service tokens (admin).
         .route("/config/clients", get(list_clients).post(create_client))
         .route("/config/clients/{id}", axum::routing::delete(delete_client))

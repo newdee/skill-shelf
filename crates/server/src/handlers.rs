@@ -18,8 +18,8 @@ use skill_shelf_core::{
 
 use crate::ai;
 use crate::config::{
-    valid_namespace, ClientView, ConfigStore, ConfigView, NamespaceInfo, NamespaceView, NewClient,
-    ResolveError, GLOBAL_NS,
+    valid_namespace, ClientView, ConfigDiff, ConfigStore, ConfigView, NamespaceInfo, NamespaceView,
+    NewClient, ResolveError, VarView, VersionInfo, GLOBAL_NS,
 };
 use crate::error::{ApiError, ApiResult};
 
@@ -990,6 +990,84 @@ pub async fn put_namespace(
 #[derive(Deserialize)]
 pub struct NsQuery {
     pub namespace: Option<String>,
+}
+
+fn ns_or_global(q: &NsQuery) -> String {
+    q.namespace.clone().unwrap_or_else(|| GLOBAL_NS.to_string())
+}
+
+// ---- config center: versioning (admin) ---------------------------------
+
+#[derive(Deserialize)]
+pub struct PublishReq {
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub note: String,
+}
+
+/// Publish a namespace's draft as a new version (what consumers then resolve).
+pub async fn publish_namespace(
+    State(st): State<AppState>,
+    Query(q): Query<NsQuery>,
+    Json(req): Json<PublishReq>,
+) -> ApiResult<Json<NamespaceView>> {
+    let ns = ns_or_global(&q);
+    st.config().publish_namespace(&ns, &req.author, &req.note).map(Json).map_err(ApiError::from)
+}
+
+/// Published version history (metadata only), newest first.
+pub async fn list_versions(
+    State(st): State<AppState>,
+    Query(q): Query<NsQuery>,
+) -> ApiResult<Json<Vec<VersionInfo>>> {
+    let ns = ns_or_global(&q);
+    if !valid_namespace(&ns) {
+        return Err(ApiError::bad_request(format!("invalid namespace: {ns:?}")));
+    }
+    Ok(Json(st.config().list_versions(&ns)))
+}
+
+#[derive(Deserialize)]
+pub struct VersionQuery {
+    pub namespace: Option<String>,
+    pub version: u64,
+}
+
+/// One published version's KV (admin; secrets masked).
+pub async fn get_version(
+    State(st): State<AppState>,
+    Query(q): Query<VersionQuery>,
+) -> ApiResult<Json<Vec<VarView>>> {
+    let ns = q.namespace.unwrap_or_else(|| GLOBAL_NS.to_string());
+    st.config().version_view(&ns, q.version).map(Json).map_err(ApiError::from)
+}
+
+#[derive(Deserialize)]
+pub struct NsRollbackReq {
+    pub version: u64,
+}
+
+/// Load a published version back into the draft (does NOT publish).
+pub async fn rollback_namespace(
+    State(st): State<AppState>,
+    Query(q): Query<NsQuery>,
+    Json(req): Json<NsRollbackReq>,
+) -> ApiResult<Json<NamespaceView>> {
+    let ns = ns_or_global(&q);
+    st.config().rollback_namespace(&ns, req.version).map(Json).map_err(ApiError::from)
+}
+
+/// Field-level diff of the draft against the latest published version.
+pub async fn diff_namespace(
+    State(st): State<AppState>,
+    Query(q): Query<NsQuery>,
+) -> ApiResult<Json<ConfigDiff>> {
+    let ns = ns_or_global(&q);
+    if !valid_namespace(&ns) {
+        return Err(ApiError::bad_request(format!("invalid namespace: {ns:?}")));
+    }
+    Ok(Json(st.config().diff_namespace(&ns)))
 }
 
 // ---- config center: clients (admin) ------------------------------------

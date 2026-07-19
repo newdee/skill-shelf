@@ -1,6 +1,6 @@
 # Skill Shelf — 架构设计文档
 
-> 一个「Skill 注册中心 + 版本管理 + 智能路由 + 反馈优化」服务。像 Git 一样管理 Claude Agent Skill 的版本，按自然语言需求返回最匹配的 skill，并通过反馈驱动 skill 持续优化。后端 Rust，前端 TS + Tauri，可同时发布到桌面和 Web。
+> 一个「Skill 注册中心 + 版本管理 + 智能路由 + 反馈优化」服务。像 Git 一样管理 Agent Skill 的版本，按自然语言需求返回最匹配的 skill，并通过反馈驱动 skill 持续优化。skill 遵循开放的 Agent Skills 规范，不绑定特定 agent/厂商，任何支持该规范的 agent 都能消费。后端 Rust，前端 TS + Tauri，可同时发布到桌面和 Web。
 
 ---
 
@@ -75,7 +75,7 @@ skill 遵循 [Agent Skills 规范](https://agentskills.io/specification)：根�
 
 ## 3. 路由器设计
 
-路由信号 = 每个 skill 的 **`description`（Claude Skill 约定描述"何时使用"）+ name**，作用于每个 skill 的**已发布版本**（默认 = `main` head，后续可加显式 `publish`）。
+路由信号 = 每个 skill 的 **`description`（Agent Skills 规范约定描述"何时使用"）+ name**，作用于每个 skill 的**已发布版本**（默认 = `main` head，后续可加显式 `publish`）。
 
 ```
 需求(自然语言) ──▶ [路由器] ──▶ 排序结果 [{skill_id, name, score, matched_version}, ...]
@@ -220,7 +220,7 @@ skill-shelf/                      (Cargo workspace)
 | 导入导出 | `POST /skill/import` (zip) · `GET /skill/{id}/export?version=` (zip) |
 | 管理 | `/control/*` 用户管理（super_admin） |
 | **自身设置** | `GET /config`(读,secret 打码) · `PUT /config {key:值}`(热更新;值为 str 或 JSON;`null` 删除;仅 admin) —— Skill Shelf 自用(AI/GitHub) |
-| **配置中心** | `GET /config/namespaces` · `GET/PUT /config/namespace?namespace=X`(namespace KV,admin,secret 打码) · `GET/POST /config/clients`·`DELETE /config/clients/{id}`(service token,admin) · `GET /config/resolve?namespace=X`(消费方,`X-Config-Token` 头,返回**明文**合并配置) |
+| **配置中心** | `GET /config/namespaces` · `GET/PUT /config/namespace?namespace=X`(namespace **草稿** KV,admin,secret 打码) · `POST /config/namespace/publish?namespace=X {author,note}`(草稿定版) · `GET /config/namespace/versions?namespace=X`(历史元信息) · `GET /config/namespace/version?namespace=X&version=N`(某版本快照,打码) · `POST /config/namespace/rollback?namespace=X {version}`(载入历史版本到草稿) · `GET /config/namespace/diff?namespace=X`(草稿 vs 已发布,逐字段) · `GET/POST /config/clients`·`DELETE /config/clients/{id}`(service token,admin) · `GET /config/resolve?namespace=X`(消费方,`X-Config-Token` 头,返回**已发布**的明文合并配置) |
 | 系统 | `GET /status` |
 
 桌面端**不额外定义业务 Tauri command**——直接复用上面这套 HTTP API（打本地 sidecar）。sidecar 默认可跳过 JWT、以本地单用户运行。
@@ -257,6 +257,20 @@ Skill Shelf 兼作配置中心：其他服务启动时来这里取配置，而�
 - **关闭鉴权(无 `JWT_SECRET`)时,整个配置中心 `/config/*` 拒绝服务(403)**——否则攻击者可自助签发 token 读全部明文;`/config`(桌面自用)仍开放。
 - `_global` 会合并进每一次 resolve,故**只放非敏感共享默认值**(任何有效 token 都能读到)。
 - namespace 层的 `null` 语义是"从该层删除 key",无法覆盖式屏蔽 `_global` 的某个 key(v1 已知限制,可覆盖值、暂不能删)。
+
+### 8.3 配置版本管理（草稿 / 发布 / 回退，已实现 ✅）
+
+配置中心的每个 namespace 都是版本化的,把"编辑"与"对消费方生效"解耦:
+
+- 数据模型:`NamespaceConfig { draft: KV, versions: [ConfigVersion{version, vars, published_at, author, note}] }`。
+- **编辑改草稿**:`PUT /config/namespace` 只改 `draft`,**不影响** `resolve`。
+- **消费读已发布**:`resolve` 返回 `versions.last()`(最新已发布版)合并 `_global` 的已发布版。
+- **发布**:`publish` 把 `draft` 快照为新版本(版本号单调递增);草稿与最新已发布相同则拒绝(400)。
+- **历史 / 回退**:`versions` 列历史元信息(最新在前);`rollback` 把某历史版本载回 `draft`(**不直接发布**),admin 复核后再 `publish` 生效——即"回退了再发布"。
+- **diff**:`diff` 逐字段对比 `draft` vs 已发布(added/removed/modified),secret 两侧都打码。
+- **持久化健壮性**:写操作快照-落盘-提交(原子);加载时"文件不存在"→用默认,"解析失败"→panic 拒绝启动(绝不用空配置覆盖已有数据)。旧的裸 `{k:v}` namespace 格式按"是否含 `versions` 键"识别并迁移为已发布 v1(无 `deny_unknown_fields`,向前兼容未来新字段)。
+
+前端「Config center」页:草稿编辑 + "未发布改动"徽标/小圆点 + 逐字段 diff + Publish(带备注)+ History(版本列表/查看快照/回退)。
 
 ---
 

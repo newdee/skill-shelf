@@ -126,10 +126,32 @@ export interface ConfigView {
 export interface NamespaceInfo {
   name: string;
   keys: number;
+  version: number; // latest published version (0 = never published)
+  dirty: boolean; // draft has unpublished changes
 }
 export interface NamespaceView {
   namespace: string;
-  vars: ConfigVar[];
+  vars: ConfigVar[]; // the DRAFT keys (masked)
+  version: number;
+  dirty: boolean;
+}
+export interface VersionInfo {
+  version: number;
+  published_at: number;
+  author: string;
+  note: string;
+  keys: number;
+}
+export interface FieldChange {
+  key: string;
+  status: "added" | "removed" | "modified";
+  secret: boolean;
+  old?: unknown;
+  new?: unknown;
+}
+export interface ConfigDiff {
+  namespace: string;
+  changes: FieldChange[];
 }
 export interface ClientView {
   id: string;
@@ -163,6 +185,16 @@ export const api = {
     http.get<NamespaceView>("/config/namespace", { params: { namespace } }).then((r) => r.data),
   putNamespace: (namespace: string, patch: Record<string, unknown>) =>
     http.put<NamespaceView>("/config/namespace", patch, { params: { namespace } }).then((r) => r.data),
+  publishNamespace: (namespace: string, body: { author: string; note: string }) =>
+    http.post<NamespaceView>("/config/namespace/publish", body, { params: { namespace } }).then((r) => r.data),
+  namespaceVersions: (namespace: string) =>
+    http.get<VersionInfo[]>("/config/namespace/versions", { params: { namespace } }).then((r) => r.data),
+  namespaceVersion: (namespace: string, version: number) =>
+    http.get<ConfigVar[]>("/config/namespace/version", { params: { namespace, version } }).then((r) => r.data),
+  rollbackNamespace: (namespace: string, version: number) =>
+    http.post<NamespaceView>("/config/namespace/rollback", { version }, { params: { namespace } }).then((r) => r.data),
+  namespaceDiff: (namespace: string) =>
+    http.get<ConfigDiff>("/config/namespace/diff", { params: { namespace } }).then((r) => r.data),
   listClients: () => http.get<ClientView[]>("/config/clients").then((r) => r.data),
   createClient: (body: { name: string; namespaces: string[] }) =>
     http.post<NewClient>("/config/clients", body).then((r) => r.data),
