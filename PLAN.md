@@ -108,6 +108,7 @@
 - [x] 后端冒烟通过：exact/fuzzy/by-name/bundle/search 全部验证
 - [x] **MCP server**（`crates/mcp` → `skill-shelf-mcp`,rmcp 0.16 stdio,瘦 HTTP 桥接,`SKILL_SHELF_URL` 配置）：5 工具 `route_skill / search_skills / fetch_skill / read_skill_file / submit_feedback`（对应发现→激活→执行→闭环）
 - [x] MCP 端到端验证(stdio JSON-RPC)：initialize / tools/list(5) / route_skill / fetch_skill / submit_feedback 均通过,反馈以 `source=agent` 落库
+- [x] **MCP 配置中心取用**(见 DESIGN §8.2)：新增第 6 个工具 `get_config(namespace)`,env `SKILL_SHELF_CONFIG_TOKEN` 作 service token → `X-Config-Token` 调 `resolve`,返回已发布合并明文替代读环境变量;未设 token 明确报错;token 决定授权、无越权旁路。stdio e2e **8/8**(工具列出/已发布解析/secret 明文/继承 `_global`/草稿键不泄漏/未授权 & 无 token 报错)
 - [x] 前端：路由测试台加"精确/模糊"切换(ToggleGroup;exact 隐藏 top_k)
 
 **验收**：✅ MCP agent 可 `route_skill(need)` → `fetch_skill` 加载 SKILL.md → `submit_feedback` 反哺;`by-name` 精确直取;关键词搜索可用;前端可切精确/模糊。

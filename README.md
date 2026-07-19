@@ -56,10 +56,15 @@ pnpm dev            # http://localhost:5173,默认连后端 127.0.0.1:8080
 ### MCP(供 agent 取用)
 
 ```bash
+# 取 skill:
 SKILL_SHELF_URL=http://127.0.0.1:8080 cargo run -p skill-shelf-mcp
+# 同时让 agent 从配置中心取配置(需要一个 service token):
+SKILL_SHELF_URL=http://127.0.0.1:8080 \
+SKILL_SHELF_CONFIG_TOKEN=shelf_… \
+  cargo run -p skill-shelf-mcp
 ```
 
-以 stdio 运行,暴露工具:`route`、`list_skills`、`load_skill`、`read_skill_file`、`feedback`。
+以 stdio 运行,暴露工具:`route`、`list_skills`、`load_skill`、`read_skill_file`、`feedback`,以及 `get_config`(从配置中心取某 namespace 的已发布合并配置,替代读环境变量;需设 `SKILL_SHELF_CONFIG_TOKEN`)。
 
 ## 配置
 

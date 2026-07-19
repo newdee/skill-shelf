@@ -252,6 +252,8 @@ Skill Shelf 兼作配置中心：其他服务启动时来这里取配置，而�
 
 **消费流程**:admin 在「Config center」页建 namespace + KV、签发 client(明文 token 只展示一次)→ 消费服务 `GET /config/resolve?namespace=X` 带 `X-Config-Token: shelf_…` 头 → 拿到合并明文。
 
+**MCP 取用**:`skill-shelf-mcp` 暴露 `get_config(namespace)` 工具——agent 通过 MCP 直接取配置(替代读环境变量)。MCP server 用 env `SKILL_SHELF_CONFIG_TOKEN` 作为 service token,内部转成 `X-Config-Token` 调 `resolve`;未设 token 时该工具返回明确错误。token 决定可读哪些 namespace,MCP 不引入任何越权旁路。
+
 **鉴权/安全**:
 - `/config/resolve` 不走 admin JWT,由 handler 内校验 service token(坏 token 401、无该 namespace 授权 403)。其余 `/config/*`(namespaces/clients)admin-only。
 - **关闭鉴权(无 `JWT_SECRET`)时,整个配置中心 `/config/*` 拒绝服务(403)**——否则攻击者可自助签发 token 读全部明文;`/config`(桌面自用)仍开放。

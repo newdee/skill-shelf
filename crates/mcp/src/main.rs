@@ -18,6 +18,9 @@ const DEFAULT_URL: &str = "http://127.0.0.1:8765";
 struct Shelf {
     base: String,
     http: reqwest::Client,
+    /// Service token for the config center (`X-Config-Token`). When None, the
+    /// `get_config` tool is still advertised but errors clearly at call time.
+    config_token: Option<String>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -42,8 +45,39 @@ impl Shelf {
         Self {
             base,
             http: reqwest::Client::new(),
+            config_token: std::env::var("SKILL_SHELF_CONFIG_TOKEN").ok().filter(|s| !s.is_empty()),
             tool_router: Self::tool_router(),
         }
+    }
+
+    /// Fetch a namespace's published, merged config from the config center.
+    /// Sends the service token as `X-Config-Token`.
+    async fn resolve_config(&self, namespace: &str) -> Result<Value, ErrorData> {
+        let Some(token) = &self.config_token else {
+            return Err(oops(
+                "config center access requires the SKILL_SHELF_CONFIG_TOKEN environment variable",
+            ));
+        };
+        // The token and the resolved secrets both travel in this request, so
+        // refuse to send them in cleartext to anything but a loopback host.
+        if !is_loopback_or_https(&self.base) {
+            return Err(oops(format!(
+                "refusing to send the config token in cleartext to a non-loopback host ({}); \
+                 use an https:// SKILL_SHELF_URL",
+                self.base
+            )));
+        }
+        let r = self
+            .http
+            .get(format!("{}/config/resolve?namespace={}", self.base, urlencode(namespace)))
+            .header("X-Config-Token", token)
+            .send()
+            .await
+            .map_err(|e| oops(format!("request failed: {e}")))?;
+        if !r.status().is_success() {
+            return Err(oops(format!("backend {}: {}", r.status(), r.text().await.unwrap_or_default())));
+        }
+        r.json().await.map_err(|e| oops(format!("bad response: {e}")))
     }
 
     async fn get(&self, path: &str) -> Result<Value, ErrorData> {
@@ -112,6 +146,13 @@ struct FileRef {
     skill: String,
     /// File path within the skill (e.g. "scripts/run.py").
     path: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+struct ConfigParams {
+    /// Namespace to fetch (e.g. "service-a/prod"). Defaults to "_global" (shared
+    /// defaults). The result already includes the merged "_global" layer.
+    namespace: Option<String>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -208,6 +249,15 @@ impl Shelf {
         Ok(CallToolResult::success(vec![Content::text(content)]))
     }
 
+    #[tool(description = "Fetch this service's published config for a namespace from the config center (already merged with the shared _global layer). Requires SKILL_SHELF_CONFIG_TOKEN. Returns a flat key→value JSON — use it instead of reading environment variables.")]
+    async fn get_config(
+        &self,
+        Parameters(p): Parameters<ConfigParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let ns = p.namespace.unwrap_or_else(|| "_global".into());
+        ok_json(&self.resolve_config(&ns).await?)
+    }
+
     #[tool(description = "Give feedback on a skill after using it (-1/0/+1 + note). Closes the improvement loop.")]
     async fn submit_feedback(
         &self,
@@ -230,7 +280,8 @@ impl ServerHandler for Shelf {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Skill Shelf: route to skills for a need, fetch/load them, and give feedback."
+                "Skill Shelf: route to skills for a need, fetch/load them, give feedback, and \
+                 fetch service config from the config center (get_config)."
                     .into(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
@@ -250,6 +301,17 @@ fn decode_text(b64: &str) -> String {
         .ok()
         .and_then(|b| String::from_utf8(b).ok())
         .unwrap_or_else(|| "<binary>".to_string())
+}
+
+/// True when `base` is safe to send a credential over: https, or a loopback
+/// host (localhost / 127.0.0.0/8 / ::1) where cleartext http stays on the box.
+fn is_loopback_or_https(base: &str) -> bool {
+    if base.starts_with("https://") {
+        return true;
+    }
+    let host = base.strip_prefix("http://").unwrap_or(base);
+    let host = host.split(['/', ':']).next().unwrap_or("");
+    host == "localhost" || host == "::1" || host == "[::1]" || host.starts_with("127.")
 }
 
 fn urlencode(s: &str) -> String {
