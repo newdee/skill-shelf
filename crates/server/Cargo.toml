@@ -1,0 +1,26 @@
+[package]
+name = "skill-shelf-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "skill-shelf-server"
+path = "src/main.rs"
+
+[dependencies]
+skill-shelf-core.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+base64.workspace = true
+zip.workspace = true
+reqwest.workspace = true
+jsonwebtoken.workspace = true
+argon2.workspace = true
+password-hash.workspace = true
+sha2.workspace = true

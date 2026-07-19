@@ -1,0 +1,15 @@
+# Build the skill-shelf server (SQLite-backed).
+FROM rust:1-slim AS build
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo build --release -p skill-shelf-server
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/target/release/skill-shelf-server /usr/local/bin/skill-shelf-server
+ENV DATA_DIR=/data PORT=8080
+VOLUME /data
+EXPOSE 8080
+CMD ["skill-shelf-server"]

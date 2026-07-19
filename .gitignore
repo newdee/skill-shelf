@@ -1,0 +1,13 @@
+# Rust build output
+/target
+
+# Runtime data (content-addressed store + index db)
+/data
+/.demo-data
+
+# Local tooling / browser state
+/.gstack
+
+# OS / editor
+.DS_Store
+*.log

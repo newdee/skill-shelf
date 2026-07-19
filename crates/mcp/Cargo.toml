@@ -1,0 +1,18 @@
+[package]
+name = "skill-shelf-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "skill-shelf-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+anyhow.workspace = true
+base64.workspace = true

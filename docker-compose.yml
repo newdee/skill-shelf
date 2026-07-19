@@ -1,0 +1,51 @@
+# Web deployment. Pick the database with the `DB` env on the server:
+#   - unset            → SQLite at /data (default; best for local/small).
+#   - postgres://...    → Postgres (start it too: `docker compose --profile pg up`).
+#
+#   SQLite:   docker compose up
+#   Postgres: docker compose --profile pg up
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      DATA_DIR: /data # CAS blobs live here for both backends
+      PORT: "8080"
+      # Postgres: uncomment (and start the `db` service via --profile pg).
+      # DB: postgres://skillshelf:skillshelf@db:5432/skillshelf
+      # Require an admin login for writes:
+      # JWT_SECRET: change-me
+      # AI refine / smart routing:
+      # AI_BASE_URL: https://api.openai.com/v1
+      # AI_API_KEY: sk-...
+      # AI_MODEL: gpt-4o-mini
+    volumes:
+      - skill-data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "8088:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  # Only started with `--profile pg`.
+  db:
+    image: postgres:16
+    profiles: ["pg"]
+    environment:
+      POSTGRES_USER: skillshelf
+      POSTGRES_PASSWORD: skillshelf
+      POSTGRES_DB: skillshelf
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  skill-data:
+  pg-data:
