@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDotenv } from "./dotenv";
+import { classifyImport, parseDotenv } from "./dotenv";
 
 describe("parseDotenv", () => {
   it("parses basic KEY=value lines", () => {
@@ -67,5 +67,39 @@ describe("parseDotenv", () => {
 
   it("allows an empty value", () => {
     expect(parseDotenv("A=").vars).toEqual({ A: "" });
+  });
+});
+
+describe("classifyImport", () => {
+  const draft = [
+    { key: "SAME", value: "x", secret: false },
+    { key: "DIFF", value: "old", secret: false },
+    { key: "NUM", value: 5, secret: false },
+    { key: "SEC", value: undefined, secret: true },
+  ];
+
+  it("classifies added / overwritten / skipped", () => {
+    const r = classifyImport({ NEW: "1", SAME: "x", DIFF: "new" }, draft);
+    expect(r).toEqual([
+      { key: "NEW", value: "1", status: "added" },
+      { key: "SAME", value: "x", status: "skipped", old: "x" },
+      { key: "DIFF", value: "new", status: "overwritten", old: "old" },
+    ]);
+  });
+
+  it("non-string draft values are overwritten, never skipped", () => {
+    expect(classifyImport({ NUM: "5" }, draft)).toEqual([
+      { key: "NUM", value: "5", status: "overwritten", old: 5 },
+    ]);
+  });
+
+  it("masked secrets are overwritten without exposing old value", () => {
+    expect(classifyImport({ SEC: "s3cret" }, draft)).toEqual([
+      { key: "SEC", value: "s3cret", status: "overwritten", oldMasked: true },
+    ]);
+  });
+
+  it("empty draft classifies everything as added", () => {
+    expect(classifyImport({ A: "1" }, [])).toEqual([{ key: "A", value: "1", status: "added" }]);
   });
 });

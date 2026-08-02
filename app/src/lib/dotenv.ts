@@ -46,3 +46,29 @@ export function parseDotenv(text: string): DotenvParseResult {
   });
   return { vars, warnings };
 }
+
+export type ImportStatus = "added" | "overwritten" | "skipped";
+
+export interface ImportEntry {
+  key: string;
+  value: string;
+  status: ImportStatus;
+  old?: unknown;
+  oldMasked?: boolean;
+}
+
+/** Classify parsed .env vars against the namespace draft (spec §2 分类定义). */
+export function classifyImport(
+  vars: Record<string, string>,
+  draft: { key: string; value?: unknown; secret: boolean }[],
+): ImportEntry[] {
+  const byKey = new Map(draft.map((v) => [v.key, v]));
+  return Object.entries(vars).map(([key, value]) => {
+    const cur = byKey.get(key);
+    if (!cur) return { key, value, status: "added" as const };
+    if (cur.secret || cur.value === undefined)
+      return { key, value, status: "overwritten" as const, oldMasked: true };
+    if (cur.value === value) return { key, value, status: "skipped" as const, old: cur.value };
+    return { key, value, status: "overwritten" as const, old: cur.value };
+  });
+}
