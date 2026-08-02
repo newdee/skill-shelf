@@ -1,8 +1,13 @@
 # Skill Shelf
 
-管理 [Agent Skills](https://agentskills.io) 与 prompt 的服务:类 Git 的版本管理、按自然语言需求路由最合适的 skill、AI 反馈优化闭环,并可作为 **MCP server** 供各类 agent 直接取用。skill 遵循开放的 Agent Skills 规范,**不绑定任何特定 agent 或厂商**——任何支持该规范的 agent 都能消费。附带一个 React + Tauri 前端(桌面 / Web 同一套)。
+**AI 时代的配置中心。**
 
-> 额外能力:同一个服务还兼作**配置中心**——其他服务启动时来这里取配置,而不各自读环境变量。
+传统服务的行为由 config 决定,AI agent 的行为由 skill 与 prompt 决定——本质上都是「代码之外、运行时才取的行为定义」。Skill Shelf 把两者收进同一个服务统一管理:
+
+- **给 agent**:管理 [Agent Skills](https://agentskills.io) 与 prompt——类 Git 的版本管理、按自然语言需求路由最合适的 skill、AI 反馈优化闭环,并以 **MCP server** 形式供各类 agent 直接取用。skill 遵循开放的 Agent Skills 规范,**不绑定任何特定 agent 或厂商**。
+- **给服务**:一个轻量**配置中心**——namespace 隔离、草稿/发布版本化、service token 授权、`.env` 一键导入;其他服务启动时来这里取配置,而不各自读环境变量。
+
+附带一个 React + Tauri 前端(桌面 / Web 同一套)。
 
 ## 特性
 
@@ -13,7 +18,22 @@
 - **MCP 取用**:`skill-shelf-mcp` 以 stdio 暴露 route / 浏览 / 加载 / 读文件 / 反馈等工具,代理到 REST。
 - **运行时配置热更新**:AI / GitHub 等设置 admin 可在线改、即时生效、无需重启。
 - **配置中心**:`_global` 共享层 + 各服务 namespace 两级合并;service token(仅存哈希、按 namespace 授权)拉取合并后的**明文**配置。
+- **.env 导入**:把现有 `.env` 粘贴或选文件导入任意 namespace,导入前预览新增 / 覆盖 / 跳过 / 无效行,合并进草稿、发布前不影响消费方。
 - **可选后端**:SQLite(本地 / 小项目)或 Postgres;**可选认证**:设 `JWT_SECRET` 即开启 JWT + Argon2,首个用户为 admin。
+
+## 界面预览
+
+| Skills 列表 | Skill 详情(编辑 · 反馈 · 历史) |
+| --- | --- |
+| ![Skills](docs/screenshots/skills.png) | ![Skill detail](docs/screenshots/skill-detail.png) |
+
+| 自然语言路由 | 配置中心(草稿 diff · secret 掩码) |
+| --- | --- |
+| ![Route](docs/screenshots/route.png) | ![Config center](docs/screenshots/config-center.png) |
+
+**.env 一键导入**——粘贴或选文件,导入前逐 key 预览:
+
+![.env import](docs/screenshots/env-import.png)
 
 ## 架构
 
@@ -88,6 +108,7 @@ curl -H "X-Config-Token: shelf_…" \
 ```
 
 - **版本管理**:每个 namespace 有「草稿 / 已发布 / 历史」。编辑改草稿,消费方 `resolve` 始终读**最新已发布版本**;admin 复核逐字段 diff 后点 **Publish** 才生效。可查看历史版本、**回退**(载入草稿再发布)——"回退了再发布"。
+- **.env 导入**:namespace 工具栏「Import .env」——粘贴或选文件,前端解析(注释 / `export` 前缀 / 引号转义都认),逐 key 预览新增 / 覆盖 / 跳过后合并进草稿;值一律按字符串导入,不做类型猜测。
 - `_global` 会合并进每一次 resolve,**只放非敏感共享默认值**。
 - Skill Shelf 自身设置与配置中心**完全隔离**,自身密钥不会经 resolve 外泄。
 - 关闭认证(无 `JWT_SECRET`)时,整个配置中心 `/config/*` 拒绝服务。
