@@ -5,6 +5,7 @@ import { Download, Upload, Trash2, GitBranch, Plus, Search, Lock } from "lucide-
 import { toast } from "sonner";
 import { api, type Kind } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useT } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -41,14 +42,15 @@ import {
 } from "@/components/ui/alert-dialog";
 
 // Mirror the backend's spec rules so authors get instant feedback.
+// Returns an i18n key (translated at the render site) or null.
 function nameError(name: string, kind: Kind): string | null {
   const n = name.trim();
-  if (!n) return "Name is required";
+  if (!n) return "skills.error.nameRequired";
   if (kind === "skill") {
-    if (n.length > 64) return "Max 64 characters";
-    if (!/^[a-z0-9-]+$/.test(n)) return "Lowercase letters, digits, and hyphens only";
-    if (n.startsWith("-") || n.endsWith("-")) return "No leading or trailing hyphen";
-    if (n.includes("--")) return "No consecutive hyphens";
+    if (n.length > 64) return "skills.error.nameTooLong";
+    if (!/^[a-z0-9-]+$/.test(n)) return "skills.error.nameCharset";
+    if (n.startsWith("-") || n.endsWith("-")) return "skills.error.nameHyphenEdge";
+    if (n.includes("--")) return "skills.error.nameHyphenDouble";
   }
   return null;
 }
@@ -56,6 +58,7 @@ function nameError(name: string, kind: Kind): string | null {
 export function SkillList() {
   const qc = useQueryClient();
   const { canWrite, authEnabled } = useAuth();
+  const { t } = useT();
 
   const [q, setQ] = useState("");
   const { data: skills, isLoading, error } = useQuery({
@@ -75,7 +78,7 @@ export function SkillList() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["skills"] });
   const nErr = nameError(name, kind);
-  const dErr = description.trim() ? null : "Description is required";
+  const dErr = description.trim() ? null : "skills.error.descriptionRequired";
 
   const create = useMutation({
     mutationFn: () => api.createSkill({ name: name.trim(), description: description.trim(), kind }),
@@ -84,9 +87,9 @@ export function SkillList() {
       setDescription("");
       setNewOpen(false);
       invalidate();
-      toast.success("Created");
+      toast.success(t("skills.toast.created"));
     },
-    onError: (e) => toast.error(`Create failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("skills.toast.createFailed", { msg: (e as Error).message })),
   });
 
   const importZip = useMutation({
@@ -94,9 +97,9 @@ export function SkillList() {
     onSuccess: (s) => {
       setNewOpen(false);
       invalidate();
-      toast.success(`Imported ${s.name}`);
+      toast.success(t("skills.toast.imported", { name: s.name }));
     },
-    onError: (e) => toast.error(`Import failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("skills.toast.importFailed", { msg: (e as Error).message })),
   });
 
   const importGithub = useMutation({
@@ -105,10 +108,15 @@ export function SkillList() {
       setGhUrl("");
       setNewOpen(false);
       invalidate();
-      toast.success(`Imported ${r.imported.length}: ${r.imported.map((s) => s.name).join(", ")}`);
-      if (r.skipped.length) toast.warning(`Skipped ${r.skipped.length}`);
+      toast.success(
+        t("skills.toast.importedMany", {
+          n: r.imported.length,
+          names: r.imported.map((s) => s.name).join(", "),
+        }),
+      );
+      if (r.skipped.length) toast.warning(t("skills.toast.skipped", { n: r.skipped.length }));
     },
-    onError: (e) => toast.error(`GitHub import failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("skills.toast.githubFailed", { msg: (e as Error).message })),
   });
 
   const del = useMutation({
@@ -117,11 +125,11 @@ export function SkillList() {
       setSel(new Set());
       setConfirm(null);
       invalidate();
-      toast.success(`Deleted ${ids.length}`);
+      toast.success(t("skills.toast.deleted", { n: ids.length }));
     },
     onError: (e) => {
       setConfirm(null);
-      toast.error(`Delete failed: ${(e as Error).message}`);
+      toast.error(t("skills.toast.deleteFailed", { msg: (e as Error).message }));
     },
   });
 
@@ -136,18 +144,18 @@ export function SkillList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("skills.title")}</h1>
         <div className="flex-1" />
         {canWrite && sel.size > 0 && (
           <Button variant="outline" onClick={() => setConfirm([...sel])}>
             <Trash2 data-icon="inline-start" />
-            Delete ({sel.size})
+            {t("skills.delete")} <span className="font-mono">({sel.size})</span>
           </Button>
         )}
         {canWrite && (
           <Button onClick={() => setNewOpen(true)}>
             <Plus data-icon="inline-start" />
-            New
+            {t("skills.new")}
           </Button>
         )}
       </div>
@@ -156,7 +164,7 @@ export function SkillList() {
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder="Search skills and prompts…"
+          placeholder={t("skills.search")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -165,7 +173,7 @@ export function SkillList() {
       {!canWrite && (
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Lock className="size-3.5" />
-          Read-only — {authEnabled ? "sign in as an admin (top-right menu) to create or delete." : "open instance."}
+          {t(authEnabled ? "skills.readonly.admin" : "skills.readonly.open")}
         </p>
       )}
 
@@ -177,7 +185,7 @@ export function SkillList() {
       )}
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Cannot reach backend: {(error as Error).message}</AlertTitle>
+          <AlertTitle>{t("skills.error.backend", { msg: (error as Error).message })}</AlertTitle>
         </Alert>
       )}
 
@@ -191,31 +199,37 @@ export function SkillList() {
                     className="mt-0.5"
                     checked={sel.has(s.id)}
                     onCheckedChange={() => toggle(s.id)}
-                    aria-label={`Select ${s.name}`}
+                    aria-label={t("skills.select", { name: s.name })}
                   />
                 )}
                 <Link to="/skill/$id" params={{ id: s.id }} className="hover:underline">
                   {s.name}
                 </Link>
-                <Badge variant={s.kind === "prompt" ? "outline" : "secondary"}>{s.kind}</Badge>
-                {s.license && <Badge variant="outline">{s.license}</Badge>}
+                <Badge variant={s.kind === "prompt" ? "outline" : "secondary"} className="font-mono">
+                  {s.kind}
+                </Badge>
+                {s.license && (
+                  <Badge variant="outline" className="font-mono">
+                    {s.license}
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-3">
               <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-                {s.description || "No description."}
+                {s.description || t("skills.noDescription")}
               </p>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="sm" asChild>
                   <a href={api.exportUrl(s.id)}>
                     <Download data-icon="inline-start" />
-                    Export
+                    {t("skills.export")}
                   </a>
                 </Button>
                 {canWrite && (
                   <Button variant="ghost" size="sm" onClick={() => setConfirm([s.id])}>
                     <Trash2 data-icon="inline-start" />
-                    Delete
+                    {t("skills.delete")}
                   </Button>
                 )}
               </div>
@@ -226,9 +240,13 @@ export function SkillList() {
 
       {skills?.length === 0 && (
         <Empty>
-          <EmptyTitle>{q ? "No matches" : "No skills yet"}</EmptyTitle>
+          <EmptyTitle>{q ? t("skills.empty.noMatches") : t("skills.empty.none")}</EmptyTitle>
           <EmptyDescription>
-            {q ? "Try a different search." : canWrite ? "Create one or import from a .zip / GitHub." : "Nothing here yet."}
+            {q
+              ? t("skills.empty.tryDifferent")
+              : canWrite
+                ? t("skills.empty.getStarted")
+                : t("skills.empty.nothing")}
           </EmptyDescription>
         </Empty>
       )}
@@ -237,55 +255,61 @@ export function SkillList() {
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New</DialogTitle>
+            <DialogTitle>{t("skills.new")}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <div className="flex gap-3">
               <Field className="flex-1" data-invalid={!!nErr && !!name}>
-                <FieldLabel htmlFor="name">Name *</FieldLabel>
+                <FieldLabel htmlFor="name">{t("skills.form.name")}</FieldLabel>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="pdf-parse"
+                  placeholder={t("skills.form.namePlaceholder")}
                   aria-invalid={!!nErr && !!name}
                 />
-                {!!name && nErr && <FieldError>{nErr}</FieldError>}
+                {!!name && nErr && <FieldError>{t(nErr)}</FieldError>}
               </Field>
               <Field className="w-36">
-                <FieldLabel htmlFor="kind">Kind</FieldLabel>
+                <FieldLabel htmlFor="kind">{t("skills.form.kind")}</FieldLabel>
                 <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
-                  <SelectTrigger id="kind">
+                  <SelectTrigger id="kind" className="font-mono">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="skill">skill</SelectItem>
-                      <SelectItem value="prompt">prompt</SelectItem>
+                      <SelectItem value="skill" className="font-mono">
+                        skill
+                      </SelectItem>
+                      <SelectItem value="prompt" className="font-mono">
+                        prompt
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </Field>
             </div>
             <Field data-invalid={!!dErr && !!description}>
-              <FieldLabel htmlFor="desc">Description *</FieldLabel>
+              <FieldLabel htmlFor="desc">{t("skills.form.description")}</FieldLabel>
               <Input
                 id="desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="what it does + when to use (routing signal)"
+                placeholder={t("skills.form.descriptionPlaceholder")}
                 aria-invalid={!!dErr && !!description}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="gh">Or import from GitHub</FieldLabel>
+              <FieldLabel htmlFor="gh" className="label-mono">
+                {t("skills.form.github")}
+              </FieldLabel>
               <div className="flex gap-2">
                 <Input
                   id="gh"
                   className="flex-1"
                   value={ghUrl}
                   onChange={(e) => setGhUrl(e.target.value)}
-                  placeholder="github.com/owner/repo"
+                  placeholder={t("skills.form.githubPlaceholder")}
                 />
                 <Button
                   variant="outline"
@@ -293,7 +317,7 @@ export function SkillList() {
                   onClick={() => importGithub.mutate()}
                 >
                   <GitBranch data-icon="inline-start" />
-                  Pull
+                  {t("skills.pull")}
                 </Button>
               </div>
             </Field>
@@ -301,10 +325,10 @@ export function SkillList() {
           <DialogFooter>
             <Button variant="outline" onClick={() => fileInput.current?.click()} disabled={importZip.isPending}>
               <Upload data-icon="inline-start" />
-              Import .zip
+              {t("skills.importZip")}
             </Button>
             <Button disabled={!!nErr || !!dErr || create.isPending} onClick={() => create.mutate()}>
-              Create
+              {t("skills.create")}
             </Button>
           </DialogFooter>
           <input
@@ -325,19 +349,22 @@ export function SkillList() {
       <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {confirm?.length} item{confirm && confirm.length > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t(confirm && confirm.length > 1 ? "skills.delete.confirmMany" : "skills.delete.confirm", {
+                n: confirm?.length ?? 0,
+              })}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the {confirm && confirm.length > 1 ? "skills" : "skill"} and all{" "}
-              {confirm && confirm.length > 1 ? "their" : "its"} versions. This cannot be undone.
+              {t(confirm && confirm.length > 1 ? "skills.delete.bodyMany" : "skills.delete.body")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("skills.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => confirm && del.mutate(confirm)}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Delete
+              {t("skills.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

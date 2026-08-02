@@ -20,6 +20,7 @@
 - **配置中心**:`_global` 共享层 + 各服务 namespace 两级合并;service token(仅存哈希、按 namespace 授权)拉取合并后的**明文**配置。
 - **.env 导入**:把现有 `.env` 粘贴或选文件导入任意 namespace,导入前预览新增 / 覆盖 / 跳过 / 无效行,合并进草稿、发布前不影响消费方。
 - **可选后端**:SQLite(本地 / 小项目)或 Postgres;**可选认证**:设 `JWT_SECRET` 即开启 JWT + Argon2,首个用户为 admin。
+- **中英双语界面**:zh/en 一键切换(Header 语言按钮),跟随系统语言,零依赖 i18n 层;明暗主题都支持。
 
 ## 界面预览
 

@@ -1,4 +1,60 @@
 import type { Entry } from "./dicts";
 
-// Filled by the page owning this domain.
-export const skillDetail: Record<string, Entry> = {};
+// SkillDetail page + FeedbackPanel. UI chrome only — skill names/descriptions,
+// file paths/contents, commit messages, authors, and feedback text are user
+// data and are never translated.
+export const skillDetail: Record<string, Entry> = {
+  // SkillDetail — page
+  "detail.notFound": { zh: "未找到：{error}", en: "Not found: {error}" },
+  "detail.manifest": { zh: "清单", en: "Manifest" },
+  "detail.license": { zh: "许可证", en: "license" },
+  "detail.compatibility": { zh: "兼容性", en: "compatibility" },
+  "detail.allowedTools": { zh: "允许工具", en: "allowed-tools" },
+  "detail.files": { zh: "文件", en: "Files" },
+  "detail.newFile": { zh: "文件", en: "File" },
+  "detail.emptyFiles": { zh: "暂无文件 — 请添加", en: "empty — add a file" },
+  "detail.selectFile": { zh: "选择或添加一个文件。", en: "Select or add a file." },
+  "detail.author": { zh: "作者", en: "author" },
+  "detail.commitMessage": { zh: "提交信息", en: "commit message" },
+  "detail.validate": { zh: "校验", en: "Validate" },
+  "detail.commit": { zh: "提交", en: "Commit" },
+  "detail.committed": { zh: "已提交", en: "Committed" },
+  "detail.commitRejected": { zh: "提交被拒绝：{error}", en: "Commit rejected: {error}" },
+  "detail.validOk": { zh: "SKILL.md 校验通过 — 名称：{name}", en: "Valid SKILL.md — name: {name}" },
+  "detail.invalid": { zh: "校验失败：{error}", en: "Invalid: {error}" },
+  "detail.history": { zh: "历史", en: "History" },
+  "detail.diff": { zh: "差异", en: "Diff" },
+  "detail.rollback": { zh: "回滚", en: "Rollback" },
+  "detail.initialCommit": { zh: "初始提交", en: "initial commit" },
+  // SkillDetail — new-file dialog
+  "detail.newFileTitle": { zh: "新建文件", en: "New file" },
+  "detail.path": { zh: "路径", en: "Path" },
+  "detail.pathPlaceholder": { zh: "scripts/run.py", en: "scripts/run.py" },
+  "detail.pathHint": {
+    zh: '使用 "/" 创建文件夹，例如 references/guide.md。',
+    en: 'Use "/" to create folders, e.g. references/guide.md.',
+  },
+  "detail.add": { zh: "添加", en: "Add" },
+  "detail.errLeadingSlash": { zh: "不能以 / 开头", en: "No leading slash" },
+  "detail.errDotDot": { zh: "不能包含 .. 片段", en: "No .. segments" },
+  "detail.errFileName": { zh: "请包含文件名（例如 folder/task.md）", en: "Include a file name (e.g. folder/task.md)" },
+  "detail.errExists": { zh: "该文件已存在", en: "That file already exists" },
+  // FeedbackPanel
+  "feedback.title": { zh: "反馈", en: "Feedback" },
+  "feedback.open": { zh: "{n} 条待处理", en: "{n} open" },
+  "feedback.bad": { zh: "差评", en: "bad" },
+  "feedback.neutral": { zh: "中立", en: "neutral" },
+  "feedback.good": { zh: "好评", en: "good" },
+  "feedback.placeholder": { zh: "哪些有效 / 哪些需要改进", en: "what worked / what to fix" },
+  "feedback.send": { zh: "发送", en: "Send" },
+  "feedback.refine": { zh: "根据反馈优化", en: "Refine from feedback" },
+  "feedback.refining": { zh: "优化中…", en: "Refining…" },
+  "feedback.merge": { zh: "合并到主干", en: "Merge to main" },
+  "feedback.discard": { zh: "放弃", en: "Discard" },
+  "feedback.draftReady": { zh: "草稿已就绪 — 请在下方查看", en: "Draft ready — review below" },
+  "feedback.refineFailed": { zh: "优化失败：{error}", en: "Refine failed: {error}" },
+  "feedback.merged": { zh: "已合并到主干", en: "Merged into main" },
+  "feedback.mergeFailed": { zh: "合并失败：{error}", en: "Merge failed: {error}" },
+  "feedback.proposed": { zh: "拟议变更（优化草稿）", en: "Proposed changes (refine draft)" },
+  "feedback.empty": { zh: "暂无反馈。", en: "No feedback yet." },
+};

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getApiBase, setApiBase } from "../lib/config";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useT } from "../lib/i18n";
 import { ConfigPanel } from "../components/ConfigPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,65 +11,68 @@ import { Input } from "@/components/ui/input";
 
 export function Settings() {
   const { canWrite } = useAuth();
+  const { t } = useT();
   const [url, setUrl] = useState(getApiBase());
   const [result, setResult] = useState<string | null>(null);
   const urlErr = !url.trim()
-    ? "Backend address is required"
+    ? t("settings.urlRequired")
     : !/^https?:\/\/.+/i.test(url.trim())
-      ? "Must start with http:// or https://"
+      ? t("settings.urlScheme")
       : null;
 
   function save() {
     setApiBase(url);
     setUrl(getApiBase());
-    setResult("Saved.");
+    setResult(t("settings.saved"));
   }
   async function test() {
-    setResult("Testing…");
+    setResult(t("settings.testing"));
     try {
       setApiBase(url);
       const s = await api.status();
-      setResult(`OK — ${s.service} v${s.version}${s.auth_enabled ? " (auth on)" : ""}`);
+      setResult(
+        t("settings.ok", { service: s.service, version: s.version }) +
+          (s.auth_enabled ? t("settings.authOn") : ""),
+      );
     } catch (e) {
-      setResult(`Failed: ${(e as Error).message}`);
+      setResult(t("settings.failed", { msg: (e as Error).message }));
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <h1>{t("settings.title")}</h1>
 
       {canWrite && <ConfigPanel />}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Backend</CardTitle>
+          <CardTitle className="text-base">{t("settings.backend")}</CardTitle>
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <Field data-invalid={!!urlErr}>
-              <FieldLabel htmlFor="url">Backend address</FieldLabel>
+              <FieldLabel htmlFor="url">{t("settings.backendAddress")}</FieldLabel>
               <Input
                 id="url"
+                className="font-mono"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="http://127.0.0.1:8080"
+                placeholder={t("settings.backendPh")}
                 aria-invalid={!!urlErr}
               />
               {urlErr ? (
                 <FieldError>{urlErr}</FieldError>
               ) : (
-                <FieldDescription>
-                  Applied at runtime — the same build can point at any server. Sign in from the top-right menu.
-                </FieldDescription>
+                <FieldDescription>{t("settings.backendHint")}</FieldDescription>
               )}
             </Field>
             <div className="flex gap-2">
               <Button disabled={!!urlErr} onClick={save}>
-                Save
+                {t("settings.save")}
               </Button>
               <Button variant="outline" disabled={!!urlErr} onClick={test}>
-                Test connection
+                {t("settings.test")}
               </Button>
             </div>
             {result && <p className="text-sm text-muted-foreground">{result}</p>}

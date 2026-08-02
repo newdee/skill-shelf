@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, type NamespaceInfo, type NewClient } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { getApiBase } from "../lib/config";
+import { useT } from "../lib/i18n";
 import { ImportEnvDialog } from "../components/ImportEnvDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,13 +44,13 @@ function parseValue(raw: string): unknown {
   }
 }
 
-/** Same rule as the backend `valid_namespace`. */
+/** Same rule as the backend `valid_namespace`. Returns an i18n key, or null when valid. */
 function nsError(name: string): string | null {
   const n = name.trim();
-  if (!n) return "Namespace is required";
-  if (n.length > 128) return "Max 128 characters";
-  if (n.includes("..")) return "Must not contain '..'";
-  if (!/^[a-zA-Z0-9._/-]+$/.test(n)) return "Letters, digits, and - _ / . only";
+  if (!n) return "config.nsErr.required";
+  if (n.length > 128) return "config.nsErr.maxLen";
+  if (n.includes("..")) return "config.nsErr.dots";
+  if (!/^[a-zA-Z0-9._/-]+$/.test(n)) return "config.nsErr.charset";
   return null;
 }
 
@@ -60,6 +61,7 @@ function fmtTime(sec: number): string {
 
 export function ConfigCenter() {
   const qc = useQueryClient();
+  const { t } = useT();
   const { canWrite, user } = useAuth();
   // Admin-only queries: don't fire (and don't retry) for non-admins, so a
   // direct visit to /config doesn't storm the server with 401s.
@@ -145,7 +147,7 @@ export function ConfigCenter() {
       setNewKey("");
       setNewVal("");
     },
-    onError: (e) => toast.error(`Save failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("config.toast.saveFailed", { msg: (e as Error).message })),
   });
 
   const publish = useMutation({
@@ -154,9 +156,9 @@ export function ConfigCenter() {
       invalidateNs(sel);
       setPubOpen(false);
       setPubNote("");
-      toast.success("Published — consumers now resolve the new version");
+      toast.success(t("config.toast.published"));
     },
-    onError: (e) => toast.error(`Publish failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("config.toast.publishFailed", { msg: (e as Error).message })),
   });
 
   const rollback = useMutation({
@@ -165,9 +167,9 @@ export function ConfigCenter() {
       invalidateNs(sel);
       setHistOpen(false);
       setViewVer(null);
-      toast.success("Loaded into draft — review, then Publish to go live");
+      toast.success(t("config.toast.rolledBack"));
     },
-    onError: (e) => toast.error(`Rollback failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("config.toast.rollbackFailed", { msg: (e as Error).message })),
   });
 
   const createClient = useMutation({
@@ -180,7 +182,7 @@ export function ConfigCenter() {
       setClientNs(new Set());
       setIssued(c); // reveal the token exactly once
     },
-    onError: (e) => toast.error(`Create failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("config.toast.createFailed", { msg: (e as Error).message })),
   });
 
   const removeClient = useMutation({
@@ -188,9 +190,9 @@ export function ConfigCenter() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setDelClient(null);
-      toast.success("Client revoked");
+      toast.success(t("config.toast.revoked"));
     },
-    onError: (e) => toast.error(`Revoke failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("config.toast.revokeFailed", { msg: (e as Error).message })),
   });
 
   // keep the selected namespace valid if the list changes — but only once the
@@ -209,7 +211,7 @@ export function ConfigCenter() {
   }, [sel]);
 
   const newKeyErr = newKey.trim() && nsView?.vars.some((v) => v.key === newKey.trim())
-    ? "Key already exists"
+    ? t("config.keyExists")
     : null;
   const nsNameErr = nsError(nsName);
   const resolveUrl = `${getApiBase()}/config/resolve?namespace=${sel}`;
@@ -218,10 +220,8 @@ export function ConfigCenter() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Admin only</CardTitle>
-          <CardDescription>
-            The config center is available to administrators. Sign in from the top-right menu.
-          </CardDescription>
+          <CardTitle className="text-base">{t("config.adminOnly")}</CardTitle>
+          <CardDescription>{t("config.adminOnlyDesc")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -230,25 +230,24 @@ export function ConfigCenter() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Config center</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Other services fetch their config from here instead of reading env vars.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("config.title")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("config.subtitle")}</p>
       </div>
 
       {(nsQuery.isError || clientsError) && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          Couldn't load config. Check you're signed in as an admin and the backend is reachable.
+          {t("config.loadError")}
         </div>
       )}
 
       {/* Namespaces + KV editor */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Namespaces</CardTitle>
+          <CardTitle className="text-base">{t("config.namespaces")}</CardTitle>
           <CardDescription>
-            Each service/environment is a namespace. <code className="rounded bg-muted px-1">_global</code> is
-            merged into every fetch — keep only shared, non-secret defaults there.
+            {t("config.nsDescPre")}
+            <code className="rounded bg-muted px-1">_global</code>
+            {t("config.nsDescPost")}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -267,60 +266,66 @@ export function ConfigCenter() {
                   }
                 >
                   {n}
-                  {n === GLOBAL_NS && <span className="opacity-60">· shared</span>}
+                  {n === GLOBAL_NS && <span className="opacity-60">· {t("config.shared")}</span>}
                   {dirty && (
                     <span
                       className="size-1.5 rounded-full bg-amber-500"
-                      title="Unpublished changes"
-                      aria-label="unpublished changes"
+                      title={t("config.unpublishedTitle")}
+                      aria-label={t("config.unpublished")}
                     />
                   )}
                 </button>
               );
             })}
             <Button size="sm" variant="outline" onClick={() => setNsOpen(true)}>
-              New namespace
+              {t("config.newNamespace")}
             </Button>
           </div>
 
           {/* Publish bar: version state + publish / history */}
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {nsView ? (nsView.version ? `published v${nsView.version}` : "never published") : "…"}
+            <Badge variant="secondary" className="font-mono">
+              {nsView
+                ? nsView.version
+                  ? t("config.publishedV", { v: nsView.version })
+                  : t("config.neverPublished")
+                : "…"}
             </Badge>
             {nsView?.dirty && (
               <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                unpublished changes
+                {t("config.unpublished")}
               </Badge>
             )}
             <div className="flex-1" />
             <Button size="sm" variant="ghost" onClick={() => setHistOpen(true)}>
-              History
+              {t("config.history")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <FileUp /> Import .env
+              <FileUp /> {t("config.importEnv")}
             </Button>
             <Button size="sm" disabled={!nsView?.dirty} onClick={() => setPubOpen(true)}>
-              Publish
+              {t("config.publish")}
             </Button>
           </div>
 
           {/* Unpublished changes (draft vs published), field-level */}
           {nsView?.dirty && diff?.changes.length ? (
             <div className="flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">
-                {nsView.version ? `Unpublished changes vs published v${nsView.version}` : "Unpublished draft (not yet published)"}
+              <div className="label-mono">
+                {nsView.version
+                  ? t("config.diffVsPublished", { v: nsView.version })
+                  : t("config.draftNotPublished")}
               </div>
               {diff.changes.map((c) => (
                 <div key={c.key} className="flex items-center gap-2">
                   <Badge variant="outline" className="w-20 justify-center text-xs">
-                    {c.status}
+                    {t(`config.status.${c.status}`)}
                   </Badge>
                   <code className="rounded bg-muted px-1">{c.key}</code>
                   {c.secret ? (
-                    <span className="text-muted-foreground">••••••••</span>
+                    <span className="font-mono text-muted-foreground">••••••••</span>
                   ) : (
-                    <span className="truncate text-muted-foreground">
+                    <span className="truncate font-mono text-muted-foreground">
                       {c.status !== "added" && <s>{JSON.stringify(c.old)}</s>}
                       {c.status === "modified" && " → "}
                       {c.status !== "removed" && JSON.stringify(c.new)}
@@ -333,23 +338,24 @@ export function ConfigCenter() {
 
           {/* KV list for the selected namespace */}
           <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              Draft keys in <code className="rounded bg-muted px-1">{sel}</code> — edits here don't affect consumers
-              until you Publish
+            <div className="label-mono">
+              {t("config.draftKeysPre")}
+              <code className="rounded bg-muted px-1 normal-case">{sel}</code>
+              {t("config.draftKeysPost")}
             </div>
             {nsView?.vars.length ? (
               nsView.vars.map((v) => (
                 <div key={v.key} className="flex items-center gap-2 text-sm">
                   <code className="rounded bg-muted px-1">{v.key}</code>
-                  <span className="flex-1 truncate text-muted-foreground">
+                  <span className="flex-1 truncate font-mono text-muted-foreground">
                     {v.secret ? "••••••••" : v.value === undefined ? "—" : JSON.stringify(v.value)}
                   </span>
-                  {v.is_json && <Badge variant="outline">json</Badge>}
-                  {v.secret && <Badge variant="outline">secret</Badge>}
+                  {v.is_json && <Badge variant="outline">{t("config.badge.json")}</Badge>}
+                  {v.secret && <Badge variant="outline">{t("config.badge.secret")}</Badge>}
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Delete key ${v.key}`}
+                    aria-label={t("config.deleteKeyAria", { key: v.key })}
                     onClick={() => setDelKey(v.key)}
                   >
                     <Trash2 />
@@ -357,20 +363,20 @@ export function ConfigCenter() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">No keys yet.</p>
+              <p className="text-sm text-muted-foreground">{t("config.noKeys")}</p>
             )}
             <div className="mt-1 flex items-end gap-2">
               <Field className="w-48">
-                <FieldLabel htmlFor="nk">Key</FieldLabel>
+                <FieldLabel htmlFor="nk">{t("config.key")}</FieldLabel>
                 <Input id="nk" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="DB_URL" />
               </Field>
               <Field className="flex-1">
-                <FieldLabel htmlFor="nv">Value (string or JSON)</FieldLabel>
+                <FieldLabel htmlFor="nv">{t("config.valueLabel")}</FieldLabel>
                 <Input
                   id="nv"
                   value={newVal}
                   onChange={(e) => setNewVal(e.target.value)}
-                  placeholder='postgres://…  or  {"max":5}'
+                  placeholder={t("config.valuePlaceholder")}
                 />
               </Field>
               <Button
@@ -378,15 +384,15 @@ export function ConfigCenter() {
                 disabled={!newKey.trim() || !!newKeyErr || savePatch.isPending}
                 onClick={() => savePatch.mutate({ ns: sel, patch: { [newKey.trim()]: parseValue(newVal) } })}
               >
-                Add
+                {t("common.add")}
               </Button>
             </div>
             {newKeyErr && <p className="text-sm text-destructive">{newKeyErr}</p>}
           </div>
 
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-            Consume with a service token:
-            <pre className="mt-1 overflow-x-auto">
+            {t("config.consumeHint")}
+            <pre className="mt-1 overflow-x-auto font-mono">
               <code>{`curl -H "X-Config-Token: shelf_…" ${resolveUrl}`}</code>
             </pre>
           </div>
@@ -396,11 +402,13 @@ export function ConfigCenter() {
       {/* Service tokens */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Service tokens</CardTitle>
+          <CardTitle className="text-base">{t("config.serviceTokens")}</CardTitle>
           <CardDescription>
-            Each client gets a token (sent as <code className="rounded bg-muted px-1">X-Config-Token</code>) that
-            may read its granted namespaces. <code className="rounded bg-muted px-1">_global</code> is always
-            included.
+            {t("config.tokensDesc1")}
+            <code className="rounded bg-muted px-1">X-Config-Token</code>
+            {t("config.tokensDesc2")}
+            <code className="rounded bg-muted px-1">_global</code>
+            {t("config.tokensDesc3")}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -408,13 +416,13 @@ export function ConfigCenter() {
             clients.map((c) => (
               <div key={c.id} className="flex items-center gap-2 text-sm">
                 <span className="font-medium">{c.name}</span>
-                <span className="flex-1 truncate text-muted-foreground">
-                  {c.namespaces.length ? c.namespaces.join(", ") : "(only _global)"}
+                <span className="flex-1 truncate font-mono text-muted-foreground">
+                  {c.namespaces.length ? c.namespaces.join(", ") : t("config.onlyGlobal")}
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Revoke token ${c.name}`}
+                  aria-label={t("config.revokeTokenAria", { name: c.name })}
                   onClick={() => setDelClient(c.id)}
                 >
                   <Trash2 />
@@ -422,11 +430,11 @@ export function ConfigCenter() {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">No clients yet.</p>
+            <p className="text-sm text-muted-foreground">{t("config.noClients")}</p>
           )}
           <div>
             <Button variant="outline" onClick={() => setClientOpen(true)}>
-              New client
+              {t("config.newClient")}
             </Button>
           </div>
         </CardContent>
@@ -446,12 +454,12 @@ export function ConfigCenter() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New namespace</DialogTitle>
-            <DialogDescription>Create a namespace and its first key.</DialogDescription>
+            <DialogTitle>{t("config.newNamespace")}</DialogTitle>
+            <DialogDescription>{t("config.newNamespaceDesc")}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <Field data-invalid={!!nsNameErr}>
-              <FieldLabel htmlFor="nsn">Name</FieldLabel>
+              <FieldLabel htmlFor="nsn">{t("config.name")}</FieldLabel>
               <Input
                 id="nsn"
                 value={nsName}
@@ -459,22 +467,22 @@ export function ConfigCenter() {
                 placeholder="service-a/prod"
                 aria-invalid={!!nsNameErr}
               />
-              {nsName && nsNameErr && <p className="text-sm text-destructive">{nsNameErr}</p>}
+              {nsName && nsNameErr && <p className="text-sm text-destructive">{t(nsNameErr)}</p>}
             </Field>
             <div className="flex items-end gap-2">
               <Field className="w-40">
-                <FieldLabel htmlFor="nsk">First key</FieldLabel>
+                <FieldLabel htmlFor="nsk">{t("config.firstKey")}</FieldLabel>
                 <Input id="nsk" value={nsKey} onChange={(e) => setNsKey(e.target.value)} placeholder="DB_URL" />
               </Field>
               <Field className="flex-1">
-                <FieldLabel htmlFor="nsv">Value</FieldLabel>
-                <Input id="nsv" value={nsVal} onChange={(e) => setNsVal(e.target.value)} placeholder="value or JSON" />
+                <FieldLabel htmlFor="nsv">{t("config.value")}</FieldLabel>
+                <Input id="nsv" value={nsVal} onChange={(e) => setNsVal(e.target.value)} placeholder={t("config.valueOrJson")} />
               </Field>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNsOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={!!nsNameErr || !nsKey.trim() || savePatch.isPending}
@@ -501,7 +509,7 @@ export function ConfigCenter() {
                 )
               }
             >
-              Create
+              {t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -520,16 +528,16 @@ export function ConfigCenter() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New service token</DialogTitle>
-            <DialogDescription>Grant the namespaces this service may read.</DialogDescription>
+            <DialogTitle>{t("config.newToken")}</DialogTitle>
+            <DialogDescription>{t("config.newTokenDesc")}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <Field>
-              <FieldLabel htmlFor="cn">Name</FieldLabel>
+              <FieldLabel htmlFor="cn">{t("config.name")}</FieldLabel>
               <Input id="cn" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="service-a" />
             </Field>
             <div>
-              <div className="mb-1 text-sm font-medium">Namespaces</div>
+              <div className="mb-1 text-sm font-medium">{t("config.namespaces")}</div>
               {serviceNs.length ? (
                 <div className="flex flex-col gap-1">
                   {serviceNs.map((n) => (
@@ -551,17 +559,19 @@ export function ConfigCenter() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No service namespaces yet — this token will read only <code>_global</code>.
+                  {t("config.noServiceNsPre")}
+                  <code>_global</code>
+                  {t("config.noServiceNsPost")}
                 </p>
               )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClientOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button disabled={!clientName.trim() || createClient.isPending} onClick={() => createClient.mutate()}>
-              Create
+              {t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -571,24 +581,22 @@ export function ConfigCenter() {
       <Dialog open={!!issued} onOpenChange={(o) => !o && setIssued(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Token for {issued?.name}</DialogTitle>
-            <DialogDescription>
-              Copy it now — it is shown only once and cannot be recovered.
-            </DialogDescription>
+            <DialogTitle>{t("config.tokenFor", { name: issued?.name ?? "" })}</DialogTitle>
+            <DialogDescription>{t("config.tokenOnce")}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
             <code className="flex-1 overflow-x-auto rounded bg-muted px-2 py-1 text-sm">{issued?.token}</code>
             <Button
               size="icon"
               variant="outline"
-              aria-label="Copy token"
+              aria-label={t("config.copyTokenAria")}
               onClick={async () => {
                 if (!issued) return;
                 try {
                   await navigator.clipboard.writeText(issued.token);
-                  toast.success("Copied");
+                  toast.success(t("common.copied"));
                 } catch {
-                  toast.error("Couldn't copy — select the token and copy it manually");
+                  toast.error(t("config.toast.copyFailed"));
                 }
               }}
             >
@@ -596,7 +604,7 @@ export function ConfigCenter() {
             </Button>
           </div>
           <DialogFooter>
-            <Button onClick={() => setIssued(null)}>Done</Button>
+            <Button onClick={() => setIssued(null)}>{t("common.done")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -619,27 +627,26 @@ export function ConfigCenter() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Publish {sel}</DialogTitle>
+            <DialogTitle>{t("config.publishNs", { ns: sel })}</DialogTitle>
             <DialogDescription>
-              Snapshots the current draft as v{(nsView?.version ?? 0) + 1}. Consumers resolving this namespace
-              will immediately receive the new values.
+              {t("config.publishDesc", { v: (nsView?.version ?? 0) + 1 })}
             </DialogDescription>
           </DialogHeader>
           <Field>
-            <FieldLabel htmlFor="pubnote">Note (optional)</FieldLabel>
+            <FieldLabel htmlFor="pubnote">{t("config.noteOptional")}</FieldLabel>
             <Input
               id="pubnote"
               value={pubNote}
               onChange={(e) => setPubNote(e.target.value)}
-              placeholder="what changed and why"
+              placeholder={t("config.notePlaceholder")}
             />
           </Field>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPubOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button disabled={publish.isPending} onClick={() => publish.mutate()}>
-              Publish
+              {t("config.publish")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -655,54 +662,56 @@ export function ConfigCenter() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>History — {sel}</DialogTitle>
-            <DialogDescription>Published versions, newest first. Roll back loads a version into the draft.</DialogDescription>
+            <DialogTitle>{t("config.historyTitle", { ns: sel })}</DialogTitle>
+            <DialogDescription>{t("config.historyDesc")}</DialogDescription>
           </DialogHeader>
           <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
             {versions?.length ? (
               versions.map((v) => (
                 <div key={v.version} className="rounded-lg border border-border/60 p-2 text-sm">
                   <div className="flex items-center gap-2">
-                    <Badge variant={v.version === nsView?.version ? "default" : "secondary"}>v{v.version}</Badge>
+                    <Badge variant={v.version === nsView?.version ? "default" : "secondary"} className="font-mono">
+                      v{v.version}
+                    </Badge>
                     <span className="flex-1 truncate">
-                      {v.note || <span className="text-muted-foreground">(no note)</span>}
+                      {v.note || <span className="text-muted-foreground">{t("config.noNote")}</span>}
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setViewVer(viewVer === v.version ? null : v.version)}
                     >
-                      {viewVer === v.version ? "Hide" : "View"}
+                      {viewVer === v.version ? t("config.hide") : t("config.view")}
                     </Button>
                     <Button size="sm" variant="outline" disabled={rollback.isPending} onClick={() => rollback.mutate(v.version)}>
-                      Roll back
+                      {t("config.rollback")}
                     </Button>
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {v.keys} keys · {v.author || "—"} · {fmtTime(v.published_at)}
+                    {t("config.keysCount", { n: v.keys })} · {v.author || "—"} · {fmtTime(v.published_at)}
                   </div>
                   {viewVer === v.version && (
                     <div className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2">
                       {verVars === undefined ? (
-                        <span className="text-xs text-muted-foreground">Loading…</span>
+                        <span className="text-xs text-muted-foreground">{t("common.loading")}</span>
                       ) : verVars.length ? (
                         verVars.map((k) => (
                           <div key={k.key} className="flex items-center gap-2">
                             <code className="rounded bg-muted px-1">{k.key}</code>
-                            <span className="flex-1 truncate text-muted-foreground">
+                            <span className="flex-1 truncate font-mono text-muted-foreground">
                               {k.secret ? "••••••••" : k.value === undefined ? "—" : JSON.stringify(k.value)}
                             </span>
                           </div>
                         ))
                       ) : (
-                        <span className="text-xs text-muted-foreground">(empty)</span>
+                        <span className="text-xs text-muted-foreground">{t("config.empty")}</span>
                       )}
                     </div>
                   )}
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">No published versions yet.</p>
+              <p className="text-sm text-muted-foreground">{t("config.noVersions")}</p>
             )}
           </div>
         </DialogContent>
@@ -712,20 +721,22 @@ export function ConfigCenter() {
       <AlertDialog open={!!delKey} onOpenChange={(o) => !o && setDelKey(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete key {delKey}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("config.deleteKeyTitle", { key: delKey ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Services resolving <code>{sel}</code> will stop receiving this key. This cannot be undone.
+              {t("config.deleteKeyDescPre")}
+              <code>{sel}</code>
+              {t("config.deleteKeyDescPost")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (delKey) savePatch.mutate({ ns: sel, patch: { [delKey]: null } });
                 setDelKey(null);
               }}
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -735,15 +746,13 @@ export function ConfigCenter() {
       <AlertDialog open={!!delClient} onOpenChange={(o) => !o && setDelClient(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke this token?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The service using it will immediately lose access. This cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("config.revokeTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("config.revokeDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => delClient && removeClient.mutate(delClient)}>
-              Revoke
+              {t("config.revoke")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

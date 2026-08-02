@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { CircleUser, LogIn, LogOut, Monitor, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
+import { useT } from "../lib/i18n";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,11 +27,17 @@ import {
 
 const THEME_ORDER: Theme[] = ["system", "light", "dark"];
 const THEME_ICON = { system: Monitor, light: Sun, dark: Moon };
+const THEME_LABEL_KEY: Record<Theme, string> = {
+  system: "account.themeSystem",
+  light: "account.themeLight",
+  dark: "account.themeDark",
+};
 
 /** The single top-right menu: Settings, Theme, and (on auth instances) sign
  * in / out. Trigger shows the username when signed in. */
 export function AccountMenu() {
   const { authEnabled, user, signIn, signUp, signOut } = useAuth();
+  const { t } = useT();
   const [theme, setThemeState] = useState<Theme>(getTheme());
   const [dialog, setDialog] = useState(false);
   const [username, setUsername] = useState("");
@@ -51,9 +58,13 @@ export function AccountMenu() {
       await (kind === "in" ? signIn(username, password) : signUp(username, password));
       setDialog(false);
       setPassword("");
-      toast.success(kind === "in" ? "Signed in" : "Account created");
+      toast.success(kind === "in" ? t("account.signedIn") : t("account.created"));
     } catch (e) {
-      toast.error(`${kind === "in" ? "Sign in" : "Sign up"} failed: ${(e as Error).message}`);
+      toast.error(
+        t(kind === "in" ? "account.signInFailed" : "account.signUpFailed", {
+          msg: (e as Error).message,
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -63,7 +74,7 @@ export function AccountMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-1.5 rounded-full" title="Menu">
+          <Button variant="ghost" size="sm" className="gap-1.5 rounded-full" title={t("account.menu")}>
             <CircleUser className="size-4" />
             {user && <span className="max-sm:hidden">{user.username}</span>}
           </Button>
@@ -73,7 +84,13 @@ export function AccountMenu() {
             <>
               <DropdownMenuLabel className="flex items-center gap-2">
                 {user.username}
-                <Badge variant={user.role === "admin" ? "secondary" : "outline"}>{user.role}</Badge>
+                <Badge variant={user.role === "admin" ? "secondary" : "outline"}>
+                  {user.role === "admin"
+                    ? t("account.roleAdmin")
+                    : user.role === "user"
+                      ? t("account.roleUser")
+                      : user.role}
+                </Badge>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
             </>
@@ -82,14 +99,14 @@ export function AccountMenu() {
           <DropdownMenuItem asChild>
             <Link to="/settings">
               <SettingsIcon />
-              Settings
+              {t("account.settings")}
             </Link>
           </DropdownMenuItem>
 
           <DropdownMenuItem onSelect={(e) => { e.preventDefault(); cycleTheme(); }}>
             <ThemeIcon />
-            Theme
-            <span className="ml-auto text-xs capitalize text-muted-foreground">{theme}</span>
+            {t("account.theme")}
+            <span className="ml-auto text-xs text-muted-foreground">{t(THEME_LABEL_KEY[theme])}</span>
           </DropdownMenuItem>
 
           {authEnabled && (
@@ -98,12 +115,12 @@ export function AccountMenu() {
               {user ? (
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut />
-                  Sign out
+                  {t("account.signOut")}
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem onSelect={() => setDialog(true)}>
                   <LogIn />
-                  Sign in
+                  {t("account.signIn")}
                 </DropdownMenuItem>
               )}
             </>
@@ -114,15 +131,15 @@ export function AccountMenu() {
       <Dialog open={dialog} onOpenChange={setDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Sign in</DialogTitle>
+            <DialogTitle>{t("account.signIn")}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="au">Username</FieldLabel>
+              <FieldLabel htmlFor="au">{t("account.username")}</FieldLabel>
               <Input id="au" value={username} onChange={(e) => setUsername(e.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="ap">Password</FieldLabel>
+              <FieldLabel htmlFor="ap">{t("account.password")}</FieldLabel>
               <Input
                 id="ap"
                 type="password"
@@ -136,13 +153,13 @@ export function AccountMenu() {
           </FieldGroup>
           <DialogFooter>
             <Button variant="outline" disabled={busy || invalid} onClick={() => doAuth("up")}>
-              Sign up
+              {t("account.signUp")}
             </Button>
             <Button disabled={busy || invalid} onClick={() => doAuth("in")}>
-              Sign in
+              {t("account.signIn")}
             </Button>
           </DialogFooter>
-          <p className="text-xs text-muted-foreground">First account becomes admin. Password ≥ 6 characters.</p>
+          <p className="text-xs text-muted-foreground">{t("account.hint")}</p>
         </DialogContent>
       </Dialog>
     </>

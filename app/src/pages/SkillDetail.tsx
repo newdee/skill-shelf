@@ -6,6 +6,7 @@ import { Plus, X, RotateCcw, GitCompare, BadgeCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, encodeContent, type Commit, type FileDiff } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useT } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ export function SkillDetail() {
   const { id } = useParams({ from: "/skill/$id" });
   const qc = useQueryClient();
   const { canWrite, user } = useAuth();
+  const { t } = useT();
 
   const skill = useQuery({ queryKey: ["skill", id], queryFn: () => api.getSkill(id) });
   const commits = useQuery({ queryKey: ["commits", id], queryFn: () => api.listCommits(id) });
@@ -73,9 +75,9 @@ export function SkillDetail() {
     onSuccess: () => {
       setMessage("");
       reload();
-      toast.success("Committed");
+      toast.success(t("detail.committed"));
     },
-    onError: (e) => toast.error(`Commit rejected: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("detail.commitRejected", { error: (e as Error).message })),
   });
 
   const rollback = useMutation({
@@ -87,10 +89,10 @@ export function SkillDetail() {
     try {
       const res = await api.validate(payload());
       if (res.ok) {
-        toast.success(`Valid SKILL.md — name: ${res.meta?.name}`);
+        toast.success(t("detail.validOk", { name: res.meta?.name ?? "" }));
         for (const w of res.warnings ?? []) toast.warning(w);
       } else {
-        toast.error(`Invalid: ${res.error}`);
+        toast.error(t("detail.invalid", { error: res.error ?? "" }));
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -103,9 +105,9 @@ export function SkillDetail() {
   }
 
   function confirmAdd() {
-    const t = newPath.trim();
-    setFiles((f) => ({ ...f, [t]: "" }));
-    setActive(t);
+    const p = newPath.trim();
+    setFiles((f) => ({ ...f, [p]: "" }));
+    setActive(p);
     setNewPath("");
     setAddOpen(false);
   }
@@ -118,18 +120,23 @@ export function SkillDetail() {
     if (active === path) setActive(null);
   }
 
-  if (skill.error) return <p className="text-sm text-muted-foreground">Not found: {(skill.error as Error).message}</p>;
+  if (skill.error)
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("detail.notFound", { error: (skill.error as Error).message })}
+      </p>
+    );
 
   const s = skill.data;
   const paths = Object.keys(files).sort();
 
   const pathErr = ((): string | null => {
-    const t = newPath.trim();
-    if (!t) return null; // don't show an error until they type
-    if (t.startsWith("/")) return "No leading slash";
-    if (t.includes("..")) return "No .. segments";
-    if (t.endsWith("/")) return "Include a file name (e.g. folder/task.md)";
-    if (files[t] !== undefined) return "That file already exists";
+    const p = newPath.trim();
+    if (!p) return null; // don't show an error until they type
+    if (p.startsWith("/")) return t("detail.errLeadingSlash");
+    if (p.includes("..")) return t("detail.errDotDot");
+    if (p.endsWith("/")) return t("detail.errFileName");
+    if (files[p] !== undefined) return t("detail.errExists");
     return null;
   })();
   const meta = s?.metadata ?? {};
@@ -140,7 +147,11 @@ export function SkillDetail() {
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
           {s?.name}
-          {s && <Badge variant={s.kind === "prompt" ? "outline" : "secondary"}>{s.kind}</Badge>}
+          {s && (
+            <Badge className="font-mono" variant={s.kind === "prompt" ? "outline" : "secondary"}>
+              {s.kind}
+            </Badge>
+          )}
         </h1>
         {s?.description && <p className="text-sm text-muted-foreground">{s.description}</p>}
       </div>
@@ -148,29 +159,29 @@ export function SkillDetail() {
       {hasManifest && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Manifest</CardTitle>
+            <CardTitle className="text-base">{t("detail.manifest")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             {s?.license && (
               <div>
-                <span className="text-muted-foreground">license</span> {s.license}
+                <span className="label-mono">{t("detail.license")}</span> {s.license}
               </div>
             )}
             {s?.compatibility && (
               <div>
-                <span className="text-muted-foreground">compatibility</span> {s.compatibility}
+                <span className="label-mono">{t("detail.compatibility")}</span> {s.compatibility}
               </div>
             )}
             {s?.allowed_tools && (
               <div>
-                <span className="text-muted-foreground">allowed-tools</span>{" "}
-                <code className="rounded bg-muted px-1">{s.allowed_tools}</code>
+                <span className="label-mono">{t("detail.allowedTools")}</span>{" "}
+                <code className="rounded bg-muted px-1 font-mono">{s.allowed_tools}</code>
               </div>
             )}
             {Object.keys(meta).length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {Object.entries(meta).map(([k, v]) => (
-                  <Badge key={k} variant="outline">
+                  <Badge key={k} className="font-mono" variant="outline">
                     {k}: {v}
                   </Badge>
                 ))}
@@ -185,12 +196,12 @@ export function SkillDetail() {
           <div className="flex items-start gap-4">
             <div className="flex w-52 flex-col gap-1">
               <div className="flex items-center">
-                <span className="font-medium">Files</span>
+                <span className="label-mono">{t("detail.files")}</span>
                 <div className="flex-1" />
                 {canWrite && (
                   <Button variant="ghost" size="sm" onClick={() => setAddOpen(true)}>
                     <Plus data-icon="inline-start" />
-                    File
+                    {t("detail.newFile")}
                   </Button>
                 )}
               </div>
@@ -199,7 +210,7 @@ export function SkillDetail() {
                   <button
                     onClick={() => setActive(p)}
                     className={cn(
-                      "truncate text-left text-sm hover:underline",
+                      "truncate text-left font-mono text-sm hover:underline",
                       p === active ? "font-semibold" : "text-muted-foreground",
                     )}
                   >
@@ -213,7 +224,9 @@ export function SkillDetail() {
                   )}
                 </div>
               ))}
-              {paths.length === 0 && <span className="text-sm text-muted-foreground">empty — add a file</span>}
+              {paths.length === 0 && (
+                <span className="text-sm text-muted-foreground">{t("detail.emptyFiles")}</span>
+              )}
             </div>
 
             <div className="min-w-0 flex-1">
@@ -228,7 +241,7 @@ export function SkillDetail() {
                   />
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Select or add a file.</p>
+                <p className="text-sm text-muted-foreground">{t("detail.selectFile")}</p>
               )}
             </div>
           </div>
@@ -238,10 +251,15 @@ export function SkillDetail() {
           <div className="flex items-center gap-2">
             {canWrite && (
               <>
-                <Input className="w-40" placeholder="author" value={author} onChange={(e) => setAuthor(e.target.value)} />
+                <Input
+                  className="w-40"
+                  placeholder={t("detail.author")}
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                />
                 <Input
                   className="flex-1"
-                  placeholder="commit message"
+                  placeholder={t("detail.commitMessage")}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                 />
@@ -251,7 +269,7 @@ export function SkillDetail() {
             {s?.kind === "skill" && (
               <Button variant="outline" onClick={validateNow} disabled={paths.length === 0}>
                 <BadgeCheck data-icon="inline-start" />
-                Validate
+                {t("detail.validate")}
               </Button>
             )}
             {canWrite && (
@@ -259,7 +277,7 @@ export function SkillDetail() {
                 disabled={paths.length === 0 || !author.trim() || !message.trim() || commit.isPending}
                 onClick={() => commit.mutate()}
               >
-                Commit
+                {t("detail.commit")}
               </Button>
             )}
           </div>
@@ -268,35 +286,37 @@ export function SkillDetail() {
 
       {s && <FeedbackPanel skillId={id} isSkill={s.kind === "skill"} />}
 
-      <h2 className="text-lg font-semibold">History</h2>
+      <h2 className="text-lg font-semibold">{t("detail.history")}</h2>
       {commits.data?.map((c) => (
         <Card key={c.id}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm font-normal">
-              <code className="rounded bg-muted px-1">{c.id.slice(0, 8)}</code>
+              <code className="rounded bg-muted px-1 font-mono">{c.id.slice(0, 8)}</code>
               <span className="font-medium">{c.message}</span>
-              <span className="text-muted-foreground">{c.author}</span>
+              <span className="label-mono">{c.author}</span>
               <div className="flex-1" />
               <Button variant="ghost" size="sm" onClick={() => showDiff(c)}>
                 <GitCompare data-icon="inline-start" />
-                Diff
+                {t("detail.diff")}
               </Button>
               {canWrite && (
                 <Button variant="ghost" size="sm" onClick={() => rollback.mutate(c.id)}>
                   <RotateCcw data-icon="inline-start" />
-                  Rollback
+                  {t("detail.rollback")}
                 </Button>
               )}
             </CardTitle>
           </CardHeader>
           {diff?.cid === c.id && (
             <CardContent>
-              {diff.entries.length === 0 && <div className="text-sm text-muted-foreground">initial commit</div>}
+              {diff.entries.length === 0 && (
+                <div className="text-sm text-muted-foreground">{t("detail.initialCommit")}</div>
+              )}
               {diff.entries
                 .filter((f) => f.status !== "unchanged")
                 .map((f) => (
                   <div key={f.path} className="mb-2">
-                    <div className="text-sm text-muted-foreground">
+                    <div className="font-mono text-xs text-muted-foreground">
                       {f.status} — {f.path}
                     </div>
                     {f.diff && <DiffBlock text={f.diff} />}
@@ -310,27 +330,28 @@ export function SkillDetail() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New file</DialogTitle>
+            <DialogTitle>{t("detail.newFileTitle")}</DialogTitle>
           </DialogHeader>
           <Field data-invalid={!!pathErr}>
-            <FieldLabel htmlFor="newpath">Path</FieldLabel>
+            <FieldLabel htmlFor="newpath">{t("detail.path")}</FieldLabel>
             <Input
               id="newpath"
               autoFocus
+              className="font-mono"
               value={newPath}
               onChange={(e) => setNewPath(e.target.value)}
-              placeholder="scripts/run.py"
+              placeholder={t("detail.pathPlaceholder")}
               aria-invalid={!!pathErr}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newPath.trim() && !pathErr) confirmAdd();
               }}
             />
-            <FieldDescription>Use "/" to create folders, e.g. references/guide.md.</FieldDescription>
+            <FieldDescription>{t("detail.pathHint")}</FieldDescription>
             {pathErr && <FieldError>{pathErr}</FieldError>}
           </Field>
           <DialogFooter>
             <Button disabled={!newPath.trim() || !!pathErr} onClick={confirmAdd}>
-              Add
+              {t("detail.add")}
             </Button>
           </DialogFooter>
         </DialogContent>

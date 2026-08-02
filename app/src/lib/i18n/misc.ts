@@ -1,4 +1,106 @@
 import type { Entry } from "./dicts";
 
-// Filled by the page owning this domain.
-export const misc: Record<string, Entry> = {};
+// RouteTester, Settings, ConfigPanel, AccountMenu.
+export const misc: Record<string, Entry> = {
+  // Route tester
+  "route.title": { zh: "路由", en: "Route" },
+  "route.subtitle": {
+    zh: "描述一个需求（模糊匹配），或精确输入技能名。",
+    en: "Describe a need (fuzzy) or name a skill exactly.",
+  },
+  "route.fuzzy": { zh: "模糊", en: "Fuzzy" },
+  "route.smart": { zh: "智能（LLM）", en: "Smart (LLM)" },
+  "route.exact": { zh: "精确", en: "Exact" },
+  "route.need": { zh: "需求", en: "Need" },
+  "route.skillName": { zh: "技能名", en: "Skill name" },
+  "route.needPh": { zh: "从 PDF 中提取文本", en: "extract text from a pdf" },
+  "route.exactPh": { zh: "pdf-parse", en: "pdf-parse" },
+  "route.topk": { zh: "top_k", en: "top_k" },
+  "route.go": { zh: "路由", en: "Route" },
+  "route.failed": { zh: "失败：{msg}", en: "Failed: {msg}" },
+  "route.score": { zh: "分数 {n}", en: "score {n}" },
+  "route.noExact": { zh: "没有该名称的技能", en: "No skill by that name" },
+  "route.noMatches": { zh: "无匹配结果", en: "No matches" },
+
+  // Settings page
+  "settings.title": { zh: "设置", en: "Settings" },
+  "settings.backend": { zh: "后端", en: "Backend" },
+  "settings.backendAddress": { zh: "后端地址", en: "Backend address" },
+  "settings.backendPh": { zh: "http://127.0.0.1:8080", en: "http://127.0.0.1:8080" },
+  "settings.backendHint": {
+    zh: "运行时生效——同一构建可指向任意服务器。请从右上角菜单登录。",
+    en: "Applied at runtime — the same build can point at any server. Sign in from the top-right menu.",
+  },
+  "settings.urlRequired": { zh: "请填写后端地址", en: "Backend address is required" },
+  "settings.urlScheme": { zh: "必须以 http:// 或 https:// 开头", en: "Must start with http:// or https://" },
+  "settings.save": { zh: "保存", en: "Save" },
+  "settings.test": { zh: "测试连接", en: "Test connection" },
+  "settings.saved": { zh: "已保存。", en: "Saved." },
+  "settings.testing": { zh: "测试中…", en: "Testing…" },
+  "settings.ok": { zh: "连接成功 — {service} v{version}", en: "OK — {service} v{version}" },
+  "settings.authOn": { zh: "（已启用认证）", en: " (auth on)" },
+  "settings.failed": { zh: "失败：{msg}", en: "Failed: {msg}" },
+
+  // Service config panel
+  "configpanel.title": { zh: "服务设置", en: "Service settings" },
+  "configpanel.aiReady": { zh: "AI 就绪", en: "AI ready" },
+  "configpanel.aiOff": { zh: "AI 未启用", en: "AI off" },
+  "configpanel.desc": {
+    zh: "本 Skill Shelf 实例自身使用的设置（AI、GitHub）。其他服务的配置在配置中心。",
+    en: "Settings this Skill Shelf instance uses itself (AI, GitHub). Config for other services lives in the Config center.",
+  },
+  "configpanel.aiSection": { zh: "AI（OpenAI 兼容）", en: "AI (OpenAI-compatible)" },
+  "configpanel.baseUrl": { zh: "接口地址", en: "Base URL" },
+  "configpanel.baseUrlPh": { zh: "https://api.openai.com/v1", en: "https://api.openai.com/v1" },
+  "configpanel.model": { zh: "模型", en: "Model" },
+  "configpanel.modelPh": { zh: "gpt-4o-mini", en: "gpt-4o-mini" },
+  "configpanel.apiKey": { zh: "API 密钥", en: "API key" },
+  "configpanel.apiKeyPh": { zh: "sk-…", en: "sk-…" },
+  "configpanel.secretSetKeep": {
+    zh: "••••••••（已设置——留空则保留）",
+    en: "•••••••• (set — leave blank to keep)",
+  },
+  "configpanel.githubSection": { zh: "GitHub", en: "GitHub" },
+  "configpanel.apiBase": { zh: "API 地址", en: "API base" },
+  "configpanel.apiBasePh": { zh: "https://api.github.com", en: "https://api.github.com" },
+  "configpanel.token": { zh: "令牌", en: "Token" },
+  "configpanel.tokenPh": { zh: "ghp_…", en: "ghp_…" },
+  "configpanel.secretSet": { zh: "••••••••（已设置）", en: "•••••••• (set)" },
+  "configpanel.save": { zh: "保存", en: "Save" },
+  "configpanel.customVars": { zh: "自定义变量（字符串或 JSON）", en: "Custom variables (string or JSON)" },
+  "configpanel.key": { zh: "键", en: "Key" },
+  "configpanel.keyPh": { zh: "MY_VAR", en: "MY_VAR" },
+  "configpanel.value": { zh: "值（字符串或 JSON）", en: "Value (string or JSON)" },
+  "configpanel.valuePh": { zh: '如 hello 或 {"a":1}', en: 'hello  or  {"a":1}' },
+  "configpanel.add": { zh: "添加", en: "Add" },
+  "configpanel.remove": { zh: "删除变量", en: "Remove variable" },
+  "configpanel.hint": {
+    zh: "立即生效，无需重启。结构性设置（PORT、DATA_DIR、DB、JWT_SECRET）仅在启动时读取。",
+    en: "Applied immediately, no restart. Structural settings (PORT, DATA_DIR, DB, JWT_SECRET) are startup-only.",
+  },
+  "configpanel.updated": { zh: "配置已更新", en: "Config updated" },
+  "configpanel.updateFailed": { zh: "更新失败：{msg}", en: "Update failed: {msg}" },
+
+  // Account menu
+  "account.menu": { zh: "菜单", en: "Menu" },
+  "account.roleAdmin": { zh: "管理员", en: "admin" },
+  "account.roleUser": { zh: "用户", en: "user" },
+  "account.settings": { zh: "设置", en: "Settings" },
+  "account.theme": { zh: "主题", en: "Theme" },
+  "account.themeSystem": { zh: "跟随系统", en: "System" },
+  "account.themeLight": { zh: "浅色", en: "Light" },
+  "account.themeDark": { zh: "深色", en: "Dark" },
+  "account.signIn": { zh: "登录", en: "Sign in" },
+  "account.signOut": { zh: "退出登录", en: "Sign out" },
+  "account.signUp": { zh: "注册", en: "Sign up" },
+  "account.username": { zh: "用户名", en: "Username" },
+  "account.password": { zh: "密码", en: "Password" },
+  "account.signedIn": { zh: "已登录", en: "Signed in" },
+  "account.created": { zh: "账号已创建", en: "Account created" },
+  "account.signInFailed": { zh: "登录失败：{msg}", en: "Sign in failed: {msg}" },
+  "account.signUpFailed": { zh: "注册失败：{msg}", en: "Sign up failed: {msg}" },
+  "account.hint": {
+    zh: "首个账号将成为管理员。密码至少 6 位。",
+    en: "First account becomes admin. Password ≥ 6 characters.",
+  },
+};

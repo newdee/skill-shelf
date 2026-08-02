@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, type ConfigView } from "../lib/api";
+import { useT } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -30,6 +31,7 @@ function parseValue(raw: string): unknown {
 }
 
 export function ConfigPanel() {
+  const { t } = useT();
   const qc = useQueryClient();
   const { data: cfg } = useQuery({ queryKey: ["config"], queryFn: api.getConfig });
 
@@ -56,9 +58,9 @@ export function ConfigPanel() {
       setGhToken("");
       setNewKey("");
       setNewVal("");
-      toast.success("Config updated");
+      toast.success(t("configpanel.updated"));
     },
-    onError: (e) => toast.error(`Update failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("configpanel.updateFailed", { msg: (e as Error).message })),
   });
 
   function saveKnown() {
@@ -78,97 +80,131 @@ export function ConfigPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          Service settings
+          {t("configpanel.title")}
           <Badge variant={cfg?.ai_ready ? "secondary" : "outline"}>
-            AI {cfg?.ai_ready ? "ready" : "off"}
+            {cfg?.ai_ready ? t("configpanel.aiReady") : t("configpanel.aiOff")}
           </Badge>
         </CardTitle>
-        <CardDescription>
-          Settings this Skill Shelf instance uses itself (AI, GitHub). Config for other services lives in
-          the Config center.
-        </CardDescription>
+        <CardDescription>{t("configpanel.desc")}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup>
-          <FieldLabel className="text-xs text-muted-foreground">AI (OpenAI-compatible)</FieldLabel>
+          <FieldLabel className="label-mono">{t("configpanel.aiSection")}</FieldLabel>
           <div className="flex gap-3">
             <Field className="flex-1">
-              <FieldLabel htmlFor="aib">Base URL</FieldLabel>
-              <Input id="aib" value={aiBase} onChange={(e) => setAiBase(e.target.value)} placeholder="https://api.openai.com/v1" />
+              <FieldLabel htmlFor="aib">{t("configpanel.baseUrl")}</FieldLabel>
+              <Input
+                id="aib"
+                className="font-mono"
+                value={aiBase}
+                onChange={(e) => setAiBase(e.target.value)}
+                placeholder={t("configpanel.baseUrlPh")}
+              />
             </Field>
             <Field className="w-48">
-              <FieldLabel htmlFor="aim">Model</FieldLabel>
-              <Input id="aim" value={aiModel} onChange={(e) => setAiModel(e.target.value)} placeholder="gpt-4o-mini" />
+              <FieldLabel htmlFor="aim">{t("configpanel.model")}</FieldLabel>
+              <Input
+                id="aim"
+                className="font-mono"
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder={t("configpanel.modelPh")}
+              />
             </Field>
           </div>
           <Field>
-            <FieldLabel htmlFor="aik">API key</FieldLabel>
+            <FieldLabel htmlFor="aik">{t("configpanel.apiKey")}</FieldLabel>
             <Input
               id="aik"
               type="password"
               value={aiKey}
               onChange={(e) => setAiKey(e.target.value)}
-              placeholder={isSet(cfg, "AI_API_KEY") ? "•••••••• (set — leave blank to keep)" : "sk-…"}
+              placeholder={isSet(cfg, "AI_API_KEY") ? t("configpanel.secretSetKeep") : t("configpanel.apiKeyPh")}
             />
           </Field>
 
-          <FieldLabel className="mt-2 text-xs text-muted-foreground">GitHub</FieldLabel>
+          <FieldLabel className="label-mono mt-2">{t("configpanel.githubSection")}</FieldLabel>
           <div className="flex gap-3">
             <Field className="flex-1">
-              <FieldLabel htmlFor="ghb">API base</FieldLabel>
-              <Input id="ghb" value={ghBase} onChange={(e) => setGhBase(e.target.value)} placeholder="https://api.github.com" />
+              <FieldLabel htmlFor="ghb">{t("configpanel.apiBase")}</FieldLabel>
+              <Input
+                id="ghb"
+                className="font-mono"
+                value={ghBase}
+                onChange={(e) => setGhBase(e.target.value)}
+                placeholder={t("configpanel.apiBasePh")}
+              />
             </Field>
             <Field className="flex-1">
-              <FieldLabel htmlFor="ght">Token</FieldLabel>
+              <FieldLabel htmlFor="ght">{t("configpanel.token")}</FieldLabel>
               <Input
                 id="ght"
                 type="password"
                 value={ghToken}
                 onChange={(e) => setGhToken(e.target.value)}
-                placeholder={isSet(cfg, "GITHUB_TOKEN") ? "•••••••• (set)" : "ghp_…"}
+                placeholder={isSet(cfg, "GITHUB_TOKEN") ? t("configpanel.secretSet") : t("configpanel.tokenPh")}
               />
             </Field>
           </div>
 
           <div>
             <Button disabled={save.isPending} onClick={saveKnown}>
-              Save
+              {t("configpanel.save")}
             </Button>
           </div>
 
-          <FieldLabel className="mt-2 text-xs text-muted-foreground">Custom variables (string or JSON)</FieldLabel>
+          <FieldLabel className="label-mono mt-2">{t("configpanel.customVars")}</FieldLabel>
           {custom.map((v) => (
             <div key={v.key} className="flex items-center gap-2 text-sm">
               <code className="rounded bg-muted px-1">{v.key}</code>
-              <span className="flex-1 truncate text-muted-foreground">
+              <span className="flex-1 truncate font-mono text-muted-foreground">
                 {v.secret ? "••••••••" : JSON.stringify(v.value)}
               </span>
-              {v.is_json && <Badge variant="outline">json</Badge>}
-              <Button variant="ghost" size="icon" onClick={() => save.mutate({ [v.key]: null })}>
+              {v.is_json && (
+                <Badge variant="outline" className="font-mono">
+                  json
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("configpanel.remove")}
+                onClick={() => save.mutate({ [v.key]: null })}
+              >
                 <Trash2 />
               </Button>
             </div>
           ))}
           <div className="flex items-end gap-2">
             <Field className="w-48">
-              <FieldLabel htmlFor="nk">Key</FieldLabel>
-              <Input id="nk" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="MY_VAR" />
+              <FieldLabel htmlFor="nk">{t("configpanel.key")}</FieldLabel>
+              <Input
+                id="nk"
+                className="font-mono"
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+                placeholder={t("configpanel.keyPh")}
+              />
             </Field>
             <Field className="flex-1">
-              <FieldLabel htmlFor="nv">Value (string or JSON)</FieldLabel>
-              <Input id="nv" value={newVal} onChange={(e) => setNewVal(e.target.value)} placeholder='hello  or  {"a":1}' />
+              <FieldLabel htmlFor="nv">{t("configpanel.value")}</FieldLabel>
+              <Input
+                id="nv"
+                className="font-mono"
+                value={newVal}
+                onChange={(e) => setNewVal(e.target.value)}
+                placeholder={t("configpanel.valuePh")}
+              />
             </Field>
             <Button
               variant="outline"
               disabled={!newKey.trim() || save.isPending}
               onClick={() => save.mutate({ [newKey.trim()]: parseValue(newVal) })}
             >
-              Add
+              {t("configpanel.add")}
             </Button>
           </div>
-          <FieldDescription>
-            Applied immediately, no restart. Structural settings (PORT, DATA_DIR, DB, JWT_SECRET) are startup-only.
-          </FieldDescription>
+          <FieldDescription>{t("configpanel.hint")}</FieldDescription>
         </FieldGroup>
       </CardContent>
     </Card>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { api, type RouteResult } from "../lib/api";
+import { useT } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +12,7 @@ import { Empty, EmptyTitle } from "@/components/ui/empty";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function RouteTester() {
+  const { t } = useT();
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(5);
   const [mode, setMode] = useState<"fuzzy" | "smart" | "exact">("fuzzy");
@@ -29,10 +31,8 @@ export function RouteTester() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-semibold">Route</h1>
-        <p className="text-sm text-muted-foreground">
-          Describe a need (fuzzy) or name a skill exactly.
-        </p>
+        <h1>{t("route.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("route.subtitle")}</p>
       </div>
 
       <Card>
@@ -44,28 +44,32 @@ export function RouteTester() {
               onValueChange={(v) => v && setMode(v as "fuzzy" | "smart" | "exact")}
               variant="outline"
             >
-              <ToggleGroupItem value="fuzzy">Fuzzy</ToggleGroupItem>
-              <ToggleGroupItem value="smart">Smart (LLM)</ToggleGroupItem>
-              <ToggleGroupItem value="exact">Exact</ToggleGroupItem>
+              <ToggleGroupItem value="fuzzy">{t("route.fuzzy")}</ToggleGroupItem>
+              <ToggleGroupItem value="smart">{t("route.smart")}</ToggleGroupItem>
+              <ToggleGroupItem value="exact">{t("route.exact")}</ToggleGroupItem>
             </ToggleGroup>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="q">{mode === "exact" ? "Skill name" : "Need"}</FieldLabel>
+              <FieldLabel htmlFor="q">
+                {mode === "exact" ? t("route.skillName") : t("route.need")}
+              </FieldLabel>
               <Textarea
                 id="q"
                 rows={mode === "exact" ? 1 : 3}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={mode === "exact" ? "pdf-parse" : "extract text from a pdf"}
+                placeholder={mode === "exact" ? t("route.exactPh") : t("route.needPh")}
               />
             </Field>
             <div className="flex items-end gap-3">
               {mode === "fuzzy" && (
                 <Field className="w-28">
-                  <FieldLabel htmlFor="k">top_k</FieldLabel>
+                  <FieldLabel htmlFor="k" className="font-mono">
+                    {t("route.topk")}
+                  </FieldLabel>
                   <Input
                     id="k"
                     type="number"
@@ -76,10 +80,10 @@ export function RouteTester() {
                 </Field>
               )}
               <Button disabled={!query.trim()} onClick={run}>
-                Route
+                {t("route.go")}
               </Button>
             </div>
-            {error && <p className="text-sm text-destructive">Failed: {error}</p>}
+            {error && <p className="text-sm text-destructive">{t("route.failed", { msg: error })}</p>}
           </FieldGroup>
         </CardContent>
       </Card>
@@ -91,7 +95,9 @@ export function RouteTester() {
               <Link to="/skill/$id" params={{ id: r.skill_id }} className="hover:underline">
                 {r.name}
               </Link>
-              <Badge variant="secondary">score {r.score.toFixed(4)}</Badge>
+              <Badge variant="secondary" className="font-mono">
+                {t("route.score", { n: r.score.toFixed(4) })}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">{r.description}</CardContent>
@@ -99,7 +105,7 @@ export function RouteTester() {
       ))}
       {results?.length === 0 && (
         <Empty>
-          <EmptyTitle>{mode === "exact" ? "No skill by that name" : "No matches"}</EmptyTitle>
+          <EmptyTitle>{mode === "exact" ? t("route.noExact") : t("route.noMatches")}</EmptyTitle>
         </Empty>
       )}
     </div>

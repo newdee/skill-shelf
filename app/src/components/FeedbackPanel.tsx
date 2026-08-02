@@ -4,6 +4,7 @@ import { Sparkles, ThumbsDown, ThumbsUp, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { api, type FileDiff } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useT } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,7 @@ import { DiffBlock } from "./DiffBlock";
 export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: boolean }) {
   const qc = useQueryClient();
   const { canWrite } = useAuth();
+  const { t } = useT();
   const feedback = useQuery({
     queryKey: ["feedback", skillId],
     queryFn: () => api.listFeedback(skillId),
@@ -41,9 +43,9 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
     mutationFn: () => api.refine(skillId),
     onSuccess: (r) => {
       setDraft(r.diff);
-      toast.success("Draft ready — review below");
+      toast.success(t("feedback.draftReady"));
     },
-    onError: (e) => toast.error(`Refine failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("feedback.refineFailed", { error: (e as Error).message })),
   });
 
   const merge = useMutation({
@@ -51,9 +53,9 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
     onSuccess: () => {
       setDraft(null);
       reloadAll();
-      toast.success("Merged into main");
+      toast.success(t("feedback.merged"));
     },
-    onError: (e) => toast.error(`Merge failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(t("feedback.mergeFailed", { error: (e as Error).message })),
   });
 
   const openCount = feedback.data?.filter((f) => f.status === "open").length ?? 0;
@@ -62,8 +64,8 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          Feedback
-          {openCount > 0 && <Badge variant="secondary">{openCount} open</Badge>}
+          {t("feedback.title")}
+          {openCount > 0 && <Badge variant="secondary">{t("feedback.open", { n: openCount })}</Badge>}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -74,25 +76,25 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
             onValueChange={(v) => v && setRating(v)}
             variant="outline"
           >
-            <ToggleGroupItem value="-1" aria-label="bad">
+            <ToggleGroupItem value="-1" aria-label={t("feedback.bad")}>
               <ThumbsDown />
             </ToggleGroupItem>
-            <ToggleGroupItem value="0" aria-label="neutral">
+            <ToggleGroupItem value="0" aria-label={t("feedback.neutral")}>
               <Minus />
             </ToggleGroupItem>
-            <ToggleGroupItem value="1" aria-label="good">
+            <ToggleGroupItem value="1" aria-label={t("feedback.good")}>
               <ThumbsUp />
             </ToggleGroupItem>
           </ToggleGroup>
           <Textarea
             className="flex-1"
             rows={2}
-            placeholder="what worked / what to fix"
+            placeholder={t("feedback.placeholder")}
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
           <Button disabled={!content.trim() || add.isPending} onClick={() => add.mutate()}>
-            Send
+            {t("feedback.send")}
           </Button>
         </div>
 
@@ -104,15 +106,15 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
               onClick={() => refine.mutate()}
             >
               <Sparkles data-icon="inline-start" />
-              {refine.isPending ? "Refining…" : "Refine from feedback"}
+              {refine.isPending ? t("feedback.refining") : t("feedback.refine")}
             </Button>
             {draft && (
               <>
                 <Button disabled={merge.isPending} onClick={() => merge.mutate()}>
-                  Merge to main
+                  {t("feedback.merge")}
                 </Button>
                 <Button variant="ghost" onClick={() => setDraft(null)}>
-                  Discard
+                  {t("feedback.discard")}
                 </Button>
               </>
             )}
@@ -121,12 +123,12 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
 
         {draft && (
           <div>
-            <div className="mb-1 text-sm text-muted-foreground">Proposed changes (refine draft)</div>
+            <div className="label-mono mb-1">{t("feedback.proposed")}</div>
             {draft
               .filter((f) => f.status !== "unchanged")
               .map((f) => (
                 <div key={f.path} className="mb-2">
-                  <div className="text-sm text-muted-foreground">
+                  <div className="font-mono text-xs text-muted-foreground">
                     {f.status} — {f.path}
                   </div>
                   {f.diff && <DiffBlock text={f.diff} />}
@@ -138,16 +140,21 @@ export function FeedbackPanel({ skillId, isSkill }: { skillId: string; isSkill: 
         <div className="flex flex-col gap-2">
           {feedback.data?.map((f) => (
             <div key={f.id} className="flex items-center gap-2 text-sm">
-              <Badge variant={f.rating < 0 ? "destructive" : f.rating > 0 ? "secondary" : "outline"}>
+              <Badge
+                className="font-mono"
+                variant={f.rating < 0 ? "destructive" : f.rating > 0 ? "secondary" : "outline"}
+              >
                 {f.rating > 0 ? "+1" : f.rating < 0 ? "-1" : "0"}
               </Badge>
               <span className="flex-1">{f.content}</span>
-              <span className="text-muted-foreground">{f.source}</span>
-              <Badge variant="outline">{f.status}</Badge>
+              <span className="label-mono">{f.source}</span>
+              <Badge className="font-mono" variant="outline">
+                {f.status}
+              </Badge>
             </div>
           ))}
           {feedback.data?.length === 0 && (
-            <span className="text-sm text-muted-foreground">No feedback yet.</span>
+            <span className="text-sm text-muted-foreground">{t("feedback.empty")}</span>
           )}
         </div>
       </CardContent>

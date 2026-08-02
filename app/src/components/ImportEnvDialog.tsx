@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, type ConfigVar } from "../lib/api";
 import { classifyImport, parseDotenv, type ImportEntry } from "../lib/dotenv";
+import { useT } from "../lib/i18n";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: Props) {
+  const { t } = useT();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,7 +63,7 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
     onSuccess: (_d, toSend) => {
       onImported();
       close(false);
-      toast.success(`Merged ${toSend.length} keys into the ${ns} draft — Publish to go live`);
+      toast.success(t("import.merged", { n: toSend.length, ns }));
     },
     onError: (e) => setError((e as Error).message),
   });
@@ -70,7 +72,7 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
     if (!f) return;
     const reader = new FileReader();
     reader.onload = () => setText(String(reader.result ?? ""));
-    reader.onerror = () => toast.error("Couldn't read the file");
+    reader.onerror = () => toast.error(t("import.readFailed"));
     reader.readAsText(f);
   };
 
@@ -78,21 +80,18 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Import .env → {ns}</DialogTitle>
-          <DialogDescription>
-            Values are imported as strings and merged into the draft. Consumers are unaffected until
-            you Publish. Existing keys not present below are left untouched.
-          </DialogDescription>
+          <DialogTitle>{t("import.title", { ns })}</DialogTitle>
+          <DialogDescription>{t("import.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={"KEY=value\n# comments are ignored"}
+            placeholder={t("import.placeholder")}
             spellCheck={false}
             className="min-h-32 font-mono text-sm"
-            aria-label=".env content"
+            aria-label={t("import.contentAria")}
           />
           <div>
             <input
@@ -102,22 +101,24 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
               onChange={(e) => pickFile(e.target.files?.[0])}
             />
             <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
-              <FileUp /> Choose file
+              <FileUp /> {t("import.chooseFile")}
             </Button>
           </div>
 
           {text.trim() ? (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge variant="secondary">{added.length} added</Badge>
+                <Badge variant="secondary">{t("import.added", { n: added.length })}</Badge>
                 <Badge
                   variant="outline"
                   className={overwritten.length ? "border-amber-500/50 text-amber-600 dark:text-amber-400" : ""}
                 >
-                  {overwritten.length} overwritten
+                  {t("import.overwritten", { n: overwritten.length })}
                 </Badge>
-                <Badge variant="outline">{skipped.length} skipped (same value)</Badge>
-                {warnings.length > 0 && <Badge variant="destructive">{warnings.length} invalid</Badge>}
+                <Badge variant="outline">{t("import.skipped", { n: skipped.length })}</Badge>
+                {warnings.length > 0 && (
+                  <Badge variant="destructive">{t("import.invalid", { n: warnings.length })}</Badge>
+                )}
               </div>
               {entries.length > 0 && (
                 <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-border/60 p-2 text-sm">
@@ -134,10 +135,10 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
                               : "")
                         }
                       >
-                        {e.status}
+                        {t(`import.status.${e.status}`)}
                       </Badge>
                       <code className="rounded bg-muted px-1">{e.key}</code>
-                      <span className="truncate text-muted-foreground">
+                      <span className="truncate font-mono text-muted-foreground">
                         {e.status === "overwritten" && (
                           <>
                             <s>{e.oldMasked ? "••••••••" : JSON.stringify(e.old)}</s>
@@ -152,12 +153,12 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
               )}
               {warnings.length > 0 && (
                 <Alert variant="destructive">
-                  <AlertTitle>Some lines can't be imported</AlertTitle>
+                  <AlertTitle>{t("import.invalidTitle")}</AlertTitle>
                   <AlertDescription>
                     <ul className="list-inside list-disc">
                       {warnings.map((w) => (
                         <li key={w.line}>
-                          line {w.line}: {w.reason} — <code>{w.text.trim()}</code>
+                          {t("import.line", { n: w.line })} {w.reason} — <code>{w.text.trim()}</code>
                         </li>
                       ))}
                     </ul>
@@ -166,14 +167,12 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Paste .env content above or choose a file to see a preview.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("import.pasteHint")}</p>
           )}
 
           {error && (
             <Alert variant="destructive">
-              <AlertTitle>Import failed</AlertTitle>
+              <AlertTitle>{t("import.failed")}</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -181,13 +180,13 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
 
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             disabled={toImport === 0 || importDraft.isPending}
             onClick={() => importDraft.mutate(entries.filter((e) => e.status !== "skipped"))}
           >
-            {importDraft.isPending ? "Importing…" : `Import ${toImport} keys to draft`}
+            {importDraft.isPending ? t("import.importing") : t("import.submit", { n: toImport })}
           </Button>
         </DialogFooter>
       </DialogContent>
