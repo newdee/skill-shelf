@@ -24,6 +24,8 @@
 
 ## 界面预览
 
+Cobalt 设计系统(暗色主题,中文界面;支持明暗切换与中英双语):
+
 | Skills 列表 | Skill 详情(编辑 · 反馈 · 历史) |
 | --- | --- |
 | ![Skills](docs/screenshots/skills.png) | ![Skill detail](docs/screenshots/skill-detail.png) |
