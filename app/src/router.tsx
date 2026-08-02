@@ -5,7 +5,7 @@ import {
   Link,
   Outlet,
 } from "@tanstack/react-router";
-import { Boxes, Languages } from "lucide-react";
+import { Languages } from "lucide-react";
 import { AccountMenu } from "./components/AccountMenu";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./lib/auth";
@@ -29,7 +29,8 @@ function Layout() {
       <nav className="glass sticky top-0 z-20 border-b border-border/60 bg-background/70 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-4">
           <Link to="/" className="mr-3 flex items-center gap-2 font-heading font-semibold tracking-tight">
-            <Boxes className="size-5 text-primary" /> Skill Shelf
+            {/* Same asset as the favicon — one brand mark everywhere. */}
+            <img src="/favicon.svg" alt="" className="size-5" /> Skill Shelf
           </Link>
           <Link to="/" className={navLink} activeProps={{ className: navLinkActive }} activeOptions={{ exact: true }}>
             {t("nav.skills")}
