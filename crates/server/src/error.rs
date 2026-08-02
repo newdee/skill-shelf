@@ -48,6 +48,10 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        // 5xx reasons otherwise only reach the client, once — keep a server copy.
+        if self.code.is_server_error() {
+            tracing::error!(status = %self.code, message = %self.message, "internal error");
+        }
         (self.code, Json(json!({ "error": self.message }))).into_response()
     }
 }

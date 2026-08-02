@@ -95,7 +95,7 @@ SKILL_SHELF_CONFIG_TOKEN=shelf_… \
 
 | 类别 | 键 | 何时可改 |
 |------|-----|---------|
-| 结构性(启动期) | `PORT` · `DATA_DIR` · `DB` · `JWT_SECRET` · `ADMIN_USERNAME` / `ADMIN_PASSWORD`(可选,预建 admin;仅在尚无用户时生效) | 改动需重启 |
+| 结构性(启动期) | `PORT` · `DATA_DIR` · `DB` · `JWT_SECRET` · `ADMIN_USERNAME` / `ADMIN_PASSWORD`(可选,预建 admin;仅在尚无用户时生效) · `LOG_FORMAT=json`(日志切 JSON 行,默认人类可读) · `RUST_LOG`(过滤级别) | 改动需重启 |
 | 运行期(热更新) | `AI_BASE_URL` · `AI_API_KEY` · `AI_MODEL` · `GITHUB_TOKEN` · `GITHUB_API_BASE` · 任意自定义 | admin 在「Settings → Service settings」在线改,即时生效 |
 
 优先级:**已存值 > 环境变量 > 默认**;含 `KEY/TOKEN/SECRET/PASSWORD` 的键在读取接口打码。

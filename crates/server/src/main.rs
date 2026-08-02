@@ -12,7 +12,9 @@ use axum::routing::{get, post};
 use axum::Router;
 use skill_shelf_core::Shelf;
 use tower_http::cors::CorsLayer;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::LatencyUnit;
+use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
 use config::ConfigStore;
@@ -79,9 +81,15 @@ fn feedback_routes() -> Router<AppState> {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,tower_http=info".into()))
-        .init();
+    let filter = || {
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,tower_http=info".into())
+    };
+    // LOG_FORMAT=json switches to one-JSON-object-per-line for log collectors.
+    if std::env::var("LOG_FORMAT").is_ok_and(|v| v.eq_ignore_ascii_case("json")) {
+        tracing_subscriber::fmt().with_env_filter(filter()).json().init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter()).init();
+    }
 
     let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".into());
     let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8080);
@@ -107,7 +115,12 @@ async fn main() {
         .merge(skill_routes())
         .merge(feedback_routes())
         .layer(axum::middleware::from_fn_with_state(state.clone(), auth::require_auth))
-        .layer(TraceLayer::new_for_http())
+        // Access log at INFO: method+uri from the span, status+latency on response.
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO).latency_unit(LatencyUnit::Millis)),
+        )
         .layer(CorsLayer::permissive())
         .with_state(state);
 

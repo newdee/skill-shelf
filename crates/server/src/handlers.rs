@@ -951,6 +951,7 @@ pub async fn signup(
         };
         shelf.create_user(&req.username, &hash, role)?
     };
+    tracing::info!(username = %user.username, role = %user.role, "user signed up");
     let token = crate::auth::issue_token(&secret, &user.id, &user.username, &user.role)?;
     Ok(Json(AuthResp { token, username: user.username, role: user.role }))
 }
@@ -965,16 +966,21 @@ pub async fn signin(
     let user = st
         .shelf()
         .get_user_by_username(&req.username)
-        .map_err(|_| ApiError {
-            code: StatusCode::UNAUTHORIZED,
-            message: "invalid credentials".into(),
+        .map_err(|_| {
+            tracing::warn!(username = %req.username, "signin failed: unknown user");
+            ApiError {
+                code: StatusCode::UNAUTHORIZED,
+                message: "invalid credentials".into(),
+            }
         })?;
     if !crate::auth::verify_password(&req.password, &user.password_hash) {
+        tracing::warn!(username = %req.username, "signin failed: wrong password");
         return Err(ApiError {
             code: StatusCode::UNAUTHORIZED,
             message: "invalid credentials".into(),
         });
     }
+    tracing::info!(username = %user.username, role = %user.role, "user signed in");
     let token = crate::auth::issue_token(&secret, &user.id, &user.username, &user.role)?;
     Ok(Json(AuthResp { token, username: user.username, role: user.role }))
 }
@@ -1050,7 +1056,13 @@ pub async fn publish_namespace(
     Json(req): Json<PublishReq>,
 ) -> ApiResult<Json<NamespaceView>> {
     let ns = ns_or_global(&q);
-    st.config().publish_namespace(&ns, &req.author, &req.note).map(Json).map_err(ApiError::from)
+    st.config()
+        .publish_namespace(&ns, &req.author, &req.note)
+        .map(|v| {
+            tracing::info!(ns = %ns, version = v.version, author = %req.author, "namespace published");
+            Json(v)
+        })
+        .map_err(ApiError::from)
 }
 
 /// Published version history (metadata only), newest first.
@@ -1092,7 +1104,13 @@ pub async fn rollback_namespace(
     Json(req): Json<NsRollbackReq>,
 ) -> ApiResult<Json<NamespaceView>> {
     let ns = ns_or_global(&q);
-    st.config().rollback_namespace(&ns, req.version).map(Json).map_err(ApiError::from)
+    st.config()
+        .rollback_namespace(&ns, req.version)
+        .map(|v| {
+            tracing::info!(ns = %ns, version = req.version, "version loaded into draft (rollback)");
+            Json(v)
+        })
+        .map_err(ApiError::from)
 }
 
 /// Field-level diff of the draft against the latest published version.
@@ -1126,7 +1144,13 @@ pub async fn create_client(
     State(st): State<AppState>,
     Json(req): Json<CreateClientReq>,
 ) -> ApiResult<Json<NewClient>> {
-    st.config().create_client(&req.name, req.namespaces).map(Json).map_err(ApiError::from)
+    st.config()
+        .create_client(&req.name, req.namespaces)
+        .map(|c| {
+            tracing::info!(id = %c.id, name = %c.name, namespaces = ?c.namespaces, "service token issued");
+            Json(c)
+        })
+        .map_err(ApiError::from)
 }
 
 /// Revoke a client (admin).
@@ -1134,7 +1158,13 @@ pub async fn delete_client(
     State(st): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    st.config().delete_client(&id).map(|_| StatusCode::NO_CONTENT).map_err(ApiError::from)
+    st.config()
+        .delete_client(&id)
+        .map(|_| {
+            tracing::info!(id = %id, "service token revoked");
+            StatusCode::NO_CONTENT
+        })
+        .map_err(ApiError::from)
 }
 
 // ---- config center: consume (service token) ----------------------------
@@ -1154,9 +1184,16 @@ pub async fn resolve_config(
         .ok_or_else(|| ApiError::unauthorized("missing X-Config-Token header"))?;
     let ns = q.namespace.unwrap_or_else(|| GLOBAL_NS.to_string());
     match st.config().resolve(token, &ns) {
-        Ok(vars) => Ok(Json(vars)),
-        Err(ResolveError::Unauthorized) => Err(ApiError::unauthorized("invalid service token")),
+        Ok(vars) => {
+            tracing::debug!(ns = %ns, keys = vars.len(), "config resolved");
+            Ok(Json(vars))
+        }
+        Err(ResolveError::Unauthorized) => {
+            tracing::warn!(ns = %ns, "resolve rejected: invalid service token");
+            Err(ApiError::unauthorized("invalid service token"))
+        }
         Err(ResolveError::Forbidden) => {
+            tracing::warn!(ns = %ns, "resolve rejected: token not granted this namespace");
             Err(ApiError::forbidden(format!("token not granted namespace {ns:?}")))
         }
     }

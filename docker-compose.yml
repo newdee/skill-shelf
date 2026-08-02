@@ -20,6 +20,8 @@ services:
       # without these, the first signup becomes admin):
       # ADMIN_USERNAME: admin
       # ADMIN_PASSWORD: change-me-too
+      # JSON logs for collectors (default is human-readable):
+      # LOG_FORMAT: json
       # AI refine / smart routing:
       # AI_BASE_URL: https://api.openai.com/v1
       # AI_API_KEY: sk-...
