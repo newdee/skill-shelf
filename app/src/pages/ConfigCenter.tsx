@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, FileUp, Trash2 } from "lucide-react";
 
 const GLOBAL_NS = "_global";
 
@@ -298,7 +298,7 @@ export function ConfigCenter() {
               History
             </Button>
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              Import .env
+              <FileUp /> Import .env
             </Button>
             <Button size="sm" disabled={!nsView?.dirty} onClick={() => setPubOpen(true)}>
               Publish

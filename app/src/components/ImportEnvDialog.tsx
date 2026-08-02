@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, type ConfigVar } from "../lib/api";
-import { classifyImport, parseDotenv } from "../lib/dotenv";
+import { classifyImport, parseDotenv, type ImportEntry } from "../lib/dotenv";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,16 +50,18 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
     }
   };
 
+  // The entries to send are passed through mutate() so the success toast counts
+  // what was actually imported, not whatever the textarea parses to by then.
   const importDraft = useMutation({
-    mutationFn: () => {
+    mutationFn: (toSend: ImportEntry[]) => {
       const patch: Record<string, unknown> = {};
-      for (const e of entries) if (e.status !== "skipped") patch[e.key] = e.value;
+      for (const e of toSend) patch[e.key] = e.value;
       return api.putNamespace(ns, patch);
     },
-    onSuccess: () => {
+    onSuccess: (_d, toSend) => {
       onImported();
       close(false);
-      toast.success(`Merged ${toImport} keys into the ${ns} draft — Publish to go live`);
+      toast.success(`Merged ${toSend.length} keys into the ${ns} draft — Publish to go live`);
     },
     onError: (e) => setError((e as Error).message),
   });
@@ -181,7 +183,10 @@ export function ImportEnvDialog({ ns, draft, open, onOpenChange, onImported }: P
           <Button variant="outline" onClick={() => close(false)}>
             Cancel
           </Button>
-          <Button disabled={toImport === 0 || importDraft.isPending} onClick={() => importDraft.mutate()}>
+          <Button
+            disabled={toImport === 0 || importDraft.isPending}
+            onClick={() => importDraft.mutate(entries.filter((e) => e.status !== "skipped"))}
+          >
             {importDraft.isPending ? "Importing…" : `Import ${toImport} keys to draft`}
           </Button>
         </DialogFooter>
