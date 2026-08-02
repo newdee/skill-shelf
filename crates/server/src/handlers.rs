@@ -62,6 +62,43 @@ impl AppState {
     pub fn config(&self) -> &ConfigStore {
         &self.config
     }
+
+    /// Provision the admin account from `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+    /// (e.g. docker-compose) when auth is enabled and no user exists yet.
+    /// Without these, the first signup still becomes admin. Panics on invalid
+    /// credentials so a misconfigured deploy fails at startup, not at signin.
+    pub fn bootstrap_admin(&self) {
+        if self.auth_secret.is_none() {
+            return;
+        }
+        let (Ok(username), Ok(password)) =
+            (std::env::var("ADMIN_USERNAME"), std::env::var("ADMIN_PASSWORD"))
+        else {
+            return;
+        };
+        let username = username.trim().to_string();
+        if username.is_empty() {
+            panic!("ADMIN_USERNAME must not be empty");
+        }
+        if password.len() < 6 {
+            panic!("ADMIN_PASSWORD must be at least 6 characters");
+        }
+        let hash = crate::auth::hash_password(&password)
+            .unwrap_or_else(|e| panic!("failed to hash ADMIN_PASSWORD: {}", e.message));
+        let shelf = self.shelf();
+        match shelf.count_users() {
+            Ok(0) => {
+                shelf
+                    .create_user(&username, &hash, skill_shelf_core::ROLE_ADMIN)
+                    .unwrap_or_else(|e| panic!("failed to create admin user: {e}"));
+                tracing::info!("bootstrapped admin user {username:?} from ADMIN_USERNAME");
+            }
+            Ok(_) => {
+                tracing::info!("users already exist; ADMIN_USERNAME/ADMIN_PASSWORD ignored");
+            }
+            Err(e) => panic!("failed to count users during admin bootstrap: {e}"),
+        }
+    }
 }
 
 // --------------------------------------------------------------------- status

@@ -16,6 +16,10 @@ services:
       # DB: postgres://skillshelf:skillshelf@db:5432/skillshelf
       # Require an admin login for writes:
       # JWT_SECRET: change-me
+      # Pre-provision the admin account (only used while no user exists yet;
+      # without these, the first signup becomes admin):
+      # ADMIN_USERNAME: admin
+      # ADMIN_PASSWORD: change-me-too
       # AI refine / smart routing:
       # AI_BASE_URL: https://api.openai.com/v1
       # AI_API_KEY: sk-...

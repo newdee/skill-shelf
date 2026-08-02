@@ -98,6 +98,7 @@ async fn main() {
     };
     let config = ConfigStore::new(PathBuf::from(&data_dir));
     let state = AppState::new(shelf, config);
+    state.bootstrap_admin();
 
     let app = Router::new()
         .route("/status", get(status))
