@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 export type Theme = "system" | "light" | "dark";
 const KEY = "skillshelf.theme";
 
@@ -19,6 +21,19 @@ export function applyTheme(t: Theme = getTheme()): void {
 export function setTheme(t: Theme): void {
   localStorage.setItem(KEY, t);
   applyTheme(t);
+}
+
+/** Reactive resolved theme, for widgets that can't inherit CSS variables
+ * (e.g. CodeMirror). Tracks the `dark` class applyTheme() toggles. */
+export function useIsDark(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const obs = new MutationObserver(onChange);
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+      return () => obs.disconnect();
+    },
+    () => document.documentElement.classList.contains("dark"),
+  );
 }
 
 /** Apply on startup and keep following the system when set to "system". */

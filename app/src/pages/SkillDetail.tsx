@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, encodeContent, type Commit, type FileDiff } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useT } from "../lib/i18n";
+import { useIsDark } from "../lib/theme";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ export function SkillDetail() {
   const qc = useQueryClient();
   const { canWrite, user } = useAuth();
   const { t } = useT();
+  const isDark = useIsDark();
 
   const skill = useQuery({ queryKey: ["skill", id], queryFn: () => api.getSkill(id) });
   const commits = useQuery({ queryKey: ["commits", id], queryFn: () => api.listCommits(id) });
@@ -235,6 +237,7 @@ export function SkillDetail() {
                   <CodeMirror
                     value={files[active] ?? ""}
                     height="320px"
+                    theme={isDark ? "dark" : "light"}
                     editable={canWrite}
                     readOnly={!canWrite}
                     onChange={(v) => setFiles((f) => ({ ...f, [active]: v }))}
