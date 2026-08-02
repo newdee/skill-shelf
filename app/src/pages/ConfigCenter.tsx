@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, type NamespaceInfo, type NewClient } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { getApiBase } from "../lib/config";
+import { ImportEnvDialog } from "../components/ImportEnvDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -94,6 +95,7 @@ export function ConfigCenter() {
   // publish + history state
   const [pubOpen, setPubOpen] = useState(false);
   const [pubNote, setPubNote] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [viewVer, setViewVer] = useState<number | null>(null);
 
@@ -203,6 +205,7 @@ export function ConfigCenter() {
   useEffect(() => {
     setHistOpen(false);
     setViewVer(null);
+    setImportOpen(false);
   }, [sel]);
 
   const newKeyErr = newKey.trim() && nsView?.vars.some((v) => v.key === newKey.trim())
@@ -293,6 +296,9 @@ export function ConfigCenter() {
             <div className="flex-1" />
             <Button size="sm" variant="ghost" onClick={() => setHistOpen(true)}>
               History
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              Import .env
             </Button>
             <Button size="sm" disabled={!nsView?.dirty} onClick={() => setPubOpen(true)}>
               Publish
@@ -594,6 +600,14 @@ export function ConfigCenter() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportEnvDialog
+        ns={sel}
+        draft={nsView?.vars ?? []}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => invalidateNs(sel)}
+      />
 
       {/* Publish dialog */}
       <Dialog
