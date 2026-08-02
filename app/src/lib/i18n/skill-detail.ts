@@ -11,6 +11,10 @@ export const skillDetail: Record<string, Entry> = {
   "detail.compatibility": { zh: "兼容性", en: "compatibility" },
   "detail.allowedTools": { zh: "允许工具", en: "allowed-tools" },
   "detail.files": { zh: "文件", en: "Files" },
+  "detail.binaryNoPreview": {
+    zh: "该文件类型暂不支持预览",
+    en: "Preview isn't supported for this file type.",
+  },
   "detail.newFile": { zh: "文件", en: "File" },
   "detail.emptyFiles": { zh: "暂无文件 — 请添加", en: "empty — add a file" },
   "detail.selectFile": { zh: "选择或添加一个文件。", en: "Select or add a file." },

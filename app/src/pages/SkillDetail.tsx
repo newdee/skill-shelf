@@ -25,6 +25,21 @@ import { cn } from "@/lib/utils";
 import { DiffBlock } from "@/components/DiffBlock";
 import { FeedbackPanel } from "@/components/FeedbackPanel";
 
+/** A file in the working tree: editable text, or an untouched binary blob. */
+type FileBuf = { kind: "text"; text: string } | { kind: "binary"; b64: string };
+
+/** Decode base64 as strict UTF-8; NUL bytes or invalid sequences mean binary.
+ * Binaries keep their original base64 so a commit round-trips them losslessly. */
+function parseContent(b64: string): FileBuf {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  if (bytes.subarray(0, 8192).includes(0)) return { kind: "binary", b64 };
+  try {
+    return { kind: "text", text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
+  } catch {
+    return { kind: "binary", b64 };
+  }
+}
+
 export function SkillDetail() {
   const { id } = useParams({ from: "/skill/$id" });
   const qc = useQueryClient();
@@ -36,16 +51,16 @@ export function SkillDetail() {
   const commits = useQuery({ queryKey: ["commits", id], queryFn: () => api.listCommits(id) });
   const head = commits.data?.[0]?.id;
 
-  const [files, setFiles] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, FileBuf>>({});
   const [active, setActive] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!commits.isSuccess || loadedFor === (head ?? "")) return;
     (async () => {
-      const next: Record<string, string> = {};
+      const next: Record<string, FileBuf> = {};
       if (head) {
-        for (const e of await api.getTree(head)) next[e.path] = await api.getFile(head, e.path);
+        for (const e of await api.getTree(head)) next[e.path] = parseContent(await api.getFileRaw(head, e.path));
       }
       setFiles(next);
       setActive(Object.keys(next)[0] ?? null);
@@ -70,7 +85,10 @@ export function SkillDetail() {
   };
 
   const payload = () =>
-    Object.entries(files).map(([path, content]) => ({ path, content: encodeContent(content) }));
+    Object.entries(files).map(([path, f]) => ({
+      path,
+      content: f.kind === "text" ? encodeContent(f.text) : f.b64,
+    }));
 
   const commit = useMutation({
     mutationFn: () => api.commit(id, { author: author.trim(), message: message.trim(), files: payload() }),
@@ -108,7 +126,7 @@ export function SkillDetail() {
 
   function confirmAdd() {
     const p = newPath.trim();
-    setFiles((f) => ({ ...f, [p]: "" }));
+    setFiles((f) => ({ ...f, [p]: { kind: "text", text: "" } }));
     setActive(p);
     setNewPath("");
     setAddOpen(false);
@@ -233,16 +251,23 @@ export function SkillDetail() {
 
             <div className="min-w-0 flex-1">
               {active ? (
-                <div className="overflow-hidden rounded-md border">
-                  <CodeMirror
-                    value={files[active] ?? ""}
-                    height="320px"
-                    theme={isDark ? "dark" : "light"}
-                    editable={canWrite}
-                    readOnly={!canWrite}
-                    onChange={(v) => setFiles((f) => ({ ...f, [active]: v }))}
-                  />
-                </div>
+                files[active]?.kind === "binary" ? (
+                  <div className="flex h-80 flex-col items-center justify-center gap-2 rounded-md border">
+                    <span className="font-mono text-sm">{active}</span>
+                    <span className="text-sm text-muted-foreground">{t("detail.binaryNoPreview")}</span>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-md border">
+                    <CodeMirror
+                      value={files[active]?.kind === "text" ? files[active].text : ""}
+                      height="320px"
+                      theme={isDark ? "dark" : "light"}
+                      editable={canWrite}
+                      readOnly={!canWrite}
+                      onChange={(v) => setFiles((f) => ({ ...f, [active]: { kind: "text", text: v } }))}
+                    />
+                  </div>
+                )
               ) : (
                 <p className="text-sm text-muted-foreground">{t("detail.selectFile")}</p>
               )}

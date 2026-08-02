@@ -218,6 +218,11 @@ export const api = {
     http
       .get<{ path: string; content: string }>(`/commit/${cid}/file`, { params: { path } })
       .then((r) => decodeContent(r.data.content)),
+  /** Raw base64 content — for callers that must not lossily decode binaries. */
+  getFileRaw: (cid: string, path: string) =>
+    http
+      .get<{ path: string; content: string }>(`/commit/${cid}/file`, { params: { path } })
+      .then((r) => r.data.content),
 
   commit: (
     id: string,
